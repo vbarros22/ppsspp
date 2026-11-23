@@ -195,7 +195,7 @@ int P2PTransport::DoBlockingPtpRecv(AdhocSocketRequest &req, s64 &result) {
 
 	int ret = 0;
 	int sockerr = 0;
-	ret = ptpRecvFromPeer(sock, (char*)req.buffer, std::max(0, *req.length), &sockerr);
+	ret = ptpRecvFromPeer(sock, (char*)req.buffer, std::max<int>(0, *req.length), &sockerr);
 
 	// Received Data. POSIX: May received 0 bytes when the remote peer already closed the connection.
 	if (ret > 0) {
@@ -733,7 +733,7 @@ int P2PTransport::PtpOpen(const SceNetEtherAddr *saddr, int sport, const SceNetE
 	return hleLogDebug(Log::sceNet, SCE_NET_ADHOC_ERROR_INVALID_ARG, "invalid arg");
 }
 
-int P2PTransport::PtpAccept(int id, SceNetEtherAddr *addr, uint16_t *port, int timeout, int flag) {
+int P2PTransport::PtpAccept(int id, SceNetEtherAddr *addr, u16_le *port, int timeout, int flag) {
 	auto& ptpsocket = adhocSockets[id - 1]->data.ptp;
 
 	// Address Information
@@ -949,7 +949,7 @@ int P2PTransport::PtpSendNow(int id, const char *data, int len) {
 	return -1;
 }
 
-int P2PTransport::PtpSend(int id, const char *data, int *len, int timeout, int flag) {
+int P2PTransport::PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) {
 	auto socket = adhocSockets[id - 1];
 	auto& ptpsocket = socket->data.ptp;
 
@@ -1000,7 +1000,7 @@ int P2PTransport::PtpSend(int id, const char *data, int *len, int timeout, int f
 	return hleLogError(Log::sceNet, SCE_NET_ADHOC_ERROR_DISCONNECTED, "disconnected");
 }
 
-int P2PTransport::PtpRecv(int id, void *buf, int *len, int timeout, int flag) {
+int P2PTransport::PtpRecv(int id, void *buf, s32_le *len, int timeout, int flag) {
 	auto socket = adhocSockets[id - 1];
 	auto& ptpsocket = socket->data.ptp;
 
@@ -1012,7 +1012,7 @@ int P2PTransport::PtpRecv(int id, void *buf, int *len, int timeout, int flag) {
 	int error = 0;
 
 	// Receive Data. POSIX: May received 0 bytes when the remote peer already closed the connection.
-	received = ptpRecvFromPeer(socket, (char*)buf, std::max(0, *len), &error);
+	received = ptpRecvFromPeer(socket, (char*)buf, std::max<int>(0, *len), &error);
 
 	if (received == SOCKET_ERROR && (error == EAGAIN || error == EWOULDBLOCK || (ptpsocket.state == ADHOC_PTP_STATE_SYN_SENT && (error == ENOTCONN || connectInProgress(error))))) {
 		if (flag == 0) {

@@ -108,18 +108,15 @@ struct HLEMipsCallInfo {
 
 struct HLEMipsCallStack {
 	u32_le nextOff;
-	union {
-		struct {
-			u32_le func;
-			u32_le actionIndex;
-			u32_le argc;
-		};
-		struct {
-			u32_le ra;
-			u32_le v0;
-			u32_le v1;
-		};
-	};
+	// Two views of the same three words. Spelled as accessors rather than an anonymous
+	// union of anonymous structs, which can't hold u32_le where that's a class (big-endian).
+	u32_le w[3];
+	u32_le &func() { return w[0]; }
+	u32_le &actionIndex() { return w[1]; }
+	u32_le &argc() { return w[2]; }
+	u32_le &ra() { return w[0]; }
+	u32_le &v0() { return w[1]; }
+	u32_le &v1() { return w[2]; }
 };
 
 // No need to save state, always flushed at a syscall end.
@@ -878,9 +875,9 @@ static void hleFlushCalls(MIPSState *mips) {
 	sp -= sizeof(HLEMipsCallStack);
 	stackData.ptr = sp;
 	stackData->nextOff = 0xFFFFFFFF;
-	stackData->ra = mips->pc;
-	stackData->v0 = mips->r[MIPS_REG_V0];
-	stackData->v1 = mips->r[MIPS_REG_V1];
+	stackData->ra() = mips->pc;
+	stackData->v0() = mips->r[MIPS_REG_V0];
+	stackData->v1() = mips->r[MIPS_REG_V1];
 
 	// Now we'll set up the first in the chain.
 	mips->pc = enqueuedMipsCalls[0].func;
@@ -899,14 +896,14 @@ static void hleFlushCalls(MIPSState *mips) {
 		sp -= stackAligned;
 		stackData.ptr = sp;
 		stackData->nextOff = stackAligned;
-		stackData->func = info.func;
+		stackData->func() = info.func;
 		if (info.action) {
-			stackData->actionIndex = (int)mipsCallActions.size();
+			stackData->actionIndex() = (int)mipsCallActions.size();
 			mipsCallActions.push_back(info.action);
 		} else {
-			stackData->actionIndex = 0xFFFFFFFF;
+			stackData->actionIndex() = 0xFFFFFFFF;
 		}
-		stackData->argc = (int)info.args.size();
+		stackData->argc() = (int)info.args.size();
 		for (int j = 0; j < (int)info.args.size(); ++j) {
 			Memory::WriteUnchecked_U32(info.args[j], sp + sizeof(HLEMipsCallStack) + j * sizeof(u32));
 		}
@@ -930,9 +927,9 @@ void HLEReturnFromMipsCall(MIPSState *mips) {
 		return;
 	}
 
-	if (stackData->actionIndex != 0xFFFFFFFF && stackData->actionIndex < (u32)mipsCallActions.size() && mipsCallActions[stackData->actionIndex] != nullptr) {
-		PSPAction *&action = mipsCallActions[stackData->actionIndex];
-		VERBOSE_LOG(Log::HLE, "Executing action for HLE mips call at %08x, sp=%08x", stackData->func, sp);
+	if (stackData->actionIndex() != 0xFFFFFFFF && stackData->actionIndex() < (u32)mipsCallActions.size() && mipsCallActions[stackData->actionIndex()] != nullptr) {
+		PSPAction *&action = mipsCallActions[stackData->actionIndex()];
+		VERBOSE_LOG(Log::HLE, "Executing action for HLE mips call at %08x, sp=%08x", (u32)stackData->func(), sp);
 
 		// Search for the saved v0/v1 values, to preserve the PSPAction API...
 		PSPPointer<HLEMipsCallStack> finalMarker = stackData;
@@ -947,11 +944,11 @@ void HLEReturnFromMipsCall(MIPSState *mips) {
 		}
 
 		MipsCall mc;
-		mc.savedV0 = finalMarker->v0;
-		mc.savedV1 = finalMarker->v1;
+		mc.savedV0 = finalMarker->v0();
+		mc.savedV1 = finalMarker->v1();
 		action->run(mc);
-		finalMarker->v0 = mc.savedV0;
-		finalMarker->v1 = mc.savedV1;
+		finalMarker->v0() = mc.savedV0;
+		finalMarker->v1() = mc.savedV1;
 
 		delete action;
 		action = nullptr;
@@ -964,9 +961,9 @@ void HLEReturnFromMipsCall(MIPSState *mips) {
 
 	if (stackData->nextOff == 0xFFFFFFFF) {
 		// We're done.  Grab the HLE result's v0/v1 and return from the syscall.
-		mips->pc = stackData->ra;
-		mips->r[MIPS_REG_V0] = stackData->v0;
-		mips->r[MIPS_REG_V1] = stackData->v1;
+		mips->pc = stackData->ra();
+		mips->r[MIPS_REG_V0] = stackData->v0();
+		mips->r[MIPS_REG_V1] = stackData->v1();
 
 		sp += sizeof(HLEMipsCallStack);
 
@@ -985,9 +982,9 @@ void HLEReturnFromMipsCall(MIPSState *mips) {
 
 	// Alright, we have another to call.
 	hleSkipDeadbeef();
-	mips->pc = stackData->func;
+	mips->pc = stackData->func();
 	mips->r[MIPS_REG_RA] = HLEMipsCallReturnAddress();
-	for (int i = 0; i < (int)stackData->argc; i++) {
+	for (int i = 0; i < (int)stackData->argc(); i++) {
 		// The check at the start of the function should be enough to use an unchecked read (well, kinda..)
 		mips->r[MIPS_REG_A0 + i] = Memory::ReadUnchecked_U32(sp + sizeof(HLEMipsCallStack) + i * sizeof(u32));
 	}

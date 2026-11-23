@@ -2250,7 +2250,7 @@ int setUDPConnReset(int udpsock, bool enabled) {
 	return -1;
 }
 
-#if !defined(TCP_KEEPIDLE) && !PPSSPP_PLATFORM(SWITCH)
+#if !defined(TCP_KEEPIDLE) && !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(WIIU)
 #define TCP_KEEPIDLE	TCP_KEEPALIVE //TCP_KEEPIDLE on Linux is equivalent to TCP_KEEPALIVE on macOS
 #endif
 // VS 2017 compatibility
@@ -2266,7 +2266,7 @@ int setSockKeepAlive(int sock, bool keepalive, const int keepinvl, const int kee
 	int optval = keepalive ? 1 : 0;
 	int optlen = sizeof(optval);
 	int result = setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&optval, optlen);
-#if !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(OPENBSD)
+#if !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(OPENBSD) && !PPSSPP_PLATFORM(WIIU)
 	if (result == 0 && keepalive) {
 		if (getsockopt(sock, SOL_SOCKET, SO_TYPE, (char*)&optval, (socklen_t*)&optlen) == 0 && optval == SOCK_STREAM) {
 			optlen = sizeof(optval);

@@ -17,7 +17,8 @@
 
 #include "ppsspp_config.h"
 
-#if PPSSPP_PLATFORM(SWITCH)
+// Also used on the Wii U: plain heap allocations, no executable memory.
+#if PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU)
 #include <cstring>
 #include <cstdlib>
 

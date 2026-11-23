@@ -626,7 +626,7 @@ public:
 	}
 
 	// For FONT_OPEN_USER* modes, the font will automatically be freed.
-	LoadedFont *OpenFont(Font *font, FontOpenMode mode, int &error) {
+	LoadedFont *OpenFont(Font *font, FontOpenMode mode, s32_le &error) {
 		// TODO: Do something with mode, possibly save it where the PSP does in the struct.
 		// Maybe needed in Font, though?  Handlers seem... difficult to emulate.
 

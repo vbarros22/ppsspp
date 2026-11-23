@@ -85,6 +85,12 @@
         #define PPSSPP_ARCH_LOONGARCH64_LSX  1
     #endif
 #endif
+#if defined(__PPC__) && !defined(__powerpc64__)
+    // Not called PPC since the compiler may predefine that.
+    #define PPSSPP_ARCH_POWERPC 1
+    #define PPSSPP_ARCH_32BIT 1
+#endif
+
 // PLATFORM defines
 #if defined(_WIN32)
     // Covers both 32 and 64bit Windows
@@ -115,6 +121,8 @@
     #else
         #error "Unknown Apple platform"
     #endif
+#elif defined(__WIIU__)
+    #define PPSSPP_PLATFORM_WIIU 1
 #elif defined(__SWITCH__)
     #define PPSSPP_PLATFORM_SWITCH 1
 #elif defined(__ANDROID__)
@@ -135,6 +143,8 @@
 #endif
 #elif PPSSPP_PLATFORM(IOS) && !defined(__LIBRETRO__)
 // No GL
+#elif PPSSPP_PLATFORM(WIIU)
+// No GL, only GX2.
 #else
 // All other platforms support GL.
 #define PPSSPP_API_ANY_GL 1
@@ -147,4 +157,8 @@
 // Not in the libretro cores, which get their graphics context from the frontend.
 #if (PPSSPP_PLATFORM(MAC) || PPSSPP_PLATFORM(IOS)) && !defined(__LIBRETRO__)
 #define PPSSPP_API_METAL 1
+#endif
+
+#if PPSSPP_PLATFORM(WIIU)
+#define PPSSPP_API_GX2 1
 #endif

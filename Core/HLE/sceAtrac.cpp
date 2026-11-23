@@ -663,7 +663,12 @@ static u32 sceAtracGetSecondBufferInfo(int atracID, u32 fileOffsetAddr, u32 desi
 		return hleLogError(Log::Atrac, SCE_KERNEL_ERROR_ILLEGAL_ADDR, "invalid addresses");
 	}
 
-	int result = atrac->GetSecondBufferInfo(fileOffset, desiredSize);
+	// Via locals: the PSP-side words are little-endian, which isn't u32 on big-endian hosts.
+	u32 offsetValue = *fileOffset;
+	u32 sizeValue = *desiredSize;
+	int result = atrac->GetSecondBufferInfo(&offsetValue, &sizeValue);
+	*fileOffset = offsetValue;
+	*desiredSize = sizeValue;
 	switch (result) {
 	case (int)SCE_ERROR_ATRAC_SECOND_BUFFER_NOT_NEEDED:
 		return hleLogDebug(Log::Atrac, result);

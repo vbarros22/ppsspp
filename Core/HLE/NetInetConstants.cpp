@@ -1,6 +1,6 @@
 #include "ppsspp_config.h"
 
-#if PPSSPP_PLATFORM(SWITCH)
+#if PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU)
 #define __LINUX_ERRNO_EXTENSIONS__ 1
 #endif
 

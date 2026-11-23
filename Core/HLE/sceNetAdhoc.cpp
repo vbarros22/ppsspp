@@ -566,7 +566,7 @@ static void __GameModeNotify(u64 userdata, int cyclesLate) {
 					for (auto& gma : replicaGameModeAreas) {
 						if (IsMatch(gma.mac, sendermac)) {
 							DEBUG_LOG(Log::sceNet, "GameMode: Replica data Received %d bytes for Area #%d [%s]", bufsz, gma.id, mac2str(&sendermac).c_str());
-							memcpy(gma.data, gameModeBuffer, std::min(gma.size, bufsz));
+							memcpy(gma.data, gameModeBuffer, std::min<int>(gma.size, bufsz));
 							gma.dataUpdated = 1;
 							gma.updateTimestamp = CoreTiming::GetGlobalTimeUsScaled();
 							break;
@@ -1022,7 +1022,7 @@ static void pdpDeliverLocally(uint16_t sport, uint16_t dport, const void *data, 
 
 // Takes the first queued datagram into buf, or reports its size and sender with NOT_ENOUGH_SPACE when it
 // doesn't fit (it stays queued, pspautotests net/adhoc/pdp). 1 if there's none.
-static int pdpTakeFromQueue(AdhocSocket *sock, SceNetEtherAddr *saddr, uint16_t *sport, void *buf, int *len) {
+static int pdpTakeFromQueue(AdhocSocket *sock, SceNetEtherAddr *saddr, u16_le *sport, void *buf, s32_le *len) {
 	PdpQueue &queue = pdpQueues[sock];
 	if (queue.datagrams.empty()) {
 		return 1;
@@ -1061,7 +1061,7 @@ int DoBlockingPdpRecv(AdhocSocketRequest& req, s64& result) {
 		return 0;
 	}
 	pdpFillQueue(req.id);
-	uint16_t port = 0;
+	u16_le port = 0;
 	int ret = pdpTakeFromQueue(sock, req.remoteMAC, &port, req.buffer, req.length);
 	if (ret != 1) {
 		*req.remotePort = port;
@@ -2422,8 +2422,8 @@ int sceNetAdhocPdpRecv(MIPSState *mips, int id, void *addr, void * port, void *b
 	}
 
 	SceNetEtherAddr *saddr = (SceNetEtherAddr *)addr;
-	uint16_t * sport = (uint16_t *)port; //Looking at Quake3 sourcecode (net_adhoc.c) this is an "int" (32bit) but changing here to 32bit will cause FF-Type0 to see duplicated Host (thinking it was from a different host)
-	int * len = (int *)dataLength;
+	u16_le * sport = (u16_le *)port; //Looking at Quake3 sourcecode (net_adhoc.c) this is an "int" (32bit) but changing here to 32bit will cause FF-Type0 to see duplicated Host (thinking it was from a different host)
+	s32_le * len = (s32_le *)dataLength;
 
 	// Checked in this order on the PSP (pspautotests net/adhoc/pdp).
 	if (buf == NULL || len == NULL || (flag & ~ADHOC_F_NONBLOCK) != 0) {
@@ -2438,7 +2438,7 @@ int sceNetAdhocPdpRecv(MIPSState *mips, int id, void *addr, void * port, void *b
 	// The sender's address and port are optional. A blocking receive writes them later, so these
 	// can't be locals.
 	static SceNetEtherAddr discardedMac;
-	static uint16_t discardedPort;
+	static u16_le discardedPort;
 	if (saddr == NULL) {
 		saddr = &discardedMac;
 	}
@@ -3245,7 +3245,7 @@ int sceNetAdhocctlGetPeerInfo(MIPSState *mips, const char *mac, int size, u32 pe
 			SceNetAdhocctlPeerInfo * peer = findFriend(maddr);
 			if (peer != NULL && peer->last_recv != 0 && isPeerVisible(peer)) {
 				// Fake Receive Time
-				peer->last_recv = std::max(peer->last_recv, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
+				peer->last_recv = std::max<u64>(peer->last_recv, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
 
 				buf->next = 0;
 				buf->nickname = peer->nickname;
@@ -4076,14 +4076,14 @@ static int sceNetAdhocPtpAccept(MIPSState *mips, int id, u32 peerMacAddrPtr, u32
 	if (Memory::IsValidAddress(peerMacAddrPtr)) {
 		addr = PSPPointer<SceNetEtherAddr>::Create(peerMacAddrPtr);
 	}
-	uint16_t * port = NULL; //
+	u16_le * port = NULL; //
 	if (Memory::IsValidAddress(peerPortPtr)) {
-		port = (uint16_t *)Memory::GetPointerOrException(peerPortPtr);
+		port = (u16_le *)Memory::GetPointerOrException(peerPortPtr);
 	}
 	if (flag == 0) { // Prevent spamming Debug Log with retries of non-bocking socket
-		DEBUG_LOG(Log::sceNet, "sceNetAdhocPtpAccept(%d, [%08x]=%s, [%08x]=%u, %d, %u) at %08x", id, peerMacAddrPtr, mac2str(addr).c_str(), peerPortPtr, port ? *port : -1, timeout, flag, mips->pc);
+		DEBUG_LOG(Log::sceNet, "sceNetAdhocPtpAccept(%d, [%08x]=%s, [%08x]=%u, %d, %u) at %08x", id, peerMacAddrPtr, mac2str(addr).c_str(), peerPortPtr, port ? (int)*port : -1, timeout, flag, mips->pc);
 	} else {
-		VERBOSE_LOG(Log::sceNet, "sceNetAdhocPtpAccept(%d, [%08x]=%s, [%08x]=%u, %d, %u) at %08x", id, peerMacAddrPtr, mac2str(addr).c_str(), peerPortPtr, port ? *port : -1, timeout, flag, mips->pc);
+		VERBOSE_LOG(Log::sceNet, "sceNetAdhocPtpAccept(%d, [%08x]=%s, [%08x]=%u, %d, %u) at %08x", id, peerMacAddrPtr, mac2str(addr).c_str(), peerPortPtr, port ? (int)*port : -1, timeout, flag, mips->pc);
 	}
 	if (!g_Config.bEnableWlan) {
 		return hleLogError(Log::sceNet, -1, "WLAN off");
@@ -4428,7 +4428,7 @@ static int sceNetAdhocPtpListen(MIPSState *mips, const char *srcmac, int sport, 
 static int sceNetAdhocPtpSend(MIPSState *mips, int id, u32 dataAddr, u32 dataSizeAddr, int timeout, int flag) {
 	DEBUG_LOG(Log::sceNet, "sceNetAdhocPtpSend(%d,%08x,%08x,%d,%d) at %08x", id, dataAddr, dataSizeAddr, timeout, flag, mips->pc);
 
-	int * len = dataSizeAddr ? (int *)Memory::GetPointerOrException(dataSizeAddr) : nullptr;
+	s32_le * len = dataSizeAddr ? (s32_le *)Memory::GetPointerOrException(dataSizeAddr) : nullptr;
 	const char * data = Memory::GetCharPointer(dataAddr);
 	if (len == NULL) {
 		return hleLogError(Log::sceNet, SCE_NET_ADHOC_ERROR_INVALID_ARG, "invalid arg");
@@ -4507,7 +4507,7 @@ static int sceNetAdhocPtpRecv(MIPSState *mips, int id, u32 dataAddr, u32 dataSiz
 	DEBUG_LOG(Log::sceNet, "sceNetAdhocPtpRecv(%d,%08x,%08x,%d,%d) at %08x", id, dataAddr, dataSizeAddr, timeout, flag, mips->pc);
 
 	void * buf = (void *)Memory::GetPointerOrException(dataAddr);
-	int * len = (int *)Memory::GetPointerOrException(dataSizeAddr);
+	s32_le * len = (s32_le *)Memory::GetPointerOrException(dataSizeAddr);
 	// Library is initialized
 	if (netAdhocInited) {
 		// Valid Arguments. The buffer may run past the end of memory as long as what arrives fits (pspautotests net/adhoc/ptp).
@@ -4918,7 +4918,7 @@ void __NetTriggerCallbacks()
 		int newState = adhocctlState;
 		u32 flags = params->first;
 		u32 error = params->second;
-		u32_le args[3] = { 0, 0, 0 };
+		u32 args[3] = { 0, 0, 0 };
 		args[0] = flags;
 		args[1] = error;
 		u64 now = CoreTiming::GetGlobalTimeUs();
@@ -5187,7 +5187,7 @@ static int sceNetAdhocctlGetPeerList(MIPSState *mips, u32 sizeAddr, u32 bufAddr)
 						if (isPeerVisible(peer)) {
 							// Faking Last Receive Time
 							if (peer->last_recv != 0)
-								peer->last_recv = std::max(peer->last_recv, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
+								peer->last_recv = std::max<u64>(peer->last_recv, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
 
 							// Copy Peer Info
 							buf[discovered].nickname = peer->nickname;
@@ -5242,7 +5242,7 @@ static int sceNetAdhocctlGetAddrByName(MIPSState *mips, const char *nickName, u3
 	memcpy(nckName, nickName, ADHOCCTL_NICKNAME_LEN); // Copied to null-terminated var to prevent unexpected behaviour on Logs
 	nckName[ADHOCCTL_NICKNAME_LEN - 1] = 0;
 
-	WARN_LOG_REPORT_ONCE(sceNetAdhocctlGetAddrByName, Log::sceNet, "UNTESTED sceNetAdhocctlGetAddrByName(%s, [%08x]=%d/%zu, %08x) at %08x", nckName, sizeAddr, buflen ? *buflen : -1, sizeof(SceNetAdhocctlPeerInfoEmu), bufAddr, mips->pc);
+	WARN_LOG_REPORT_ONCE(sceNetAdhocctlGetAddrByName, Log::sceNet, "UNTESTED sceNetAdhocctlGetAddrByName(%s, [%08x]=%d/%zu, %08x) at %08x", nckName, sizeAddr, buflen ? (int)*buflen : -1, sizeof(SceNetAdhocctlPeerInfoEmu), bufAddr, mips->pc);
 
 	// Library initialized
 	if (netAdhocctlInited)
@@ -5291,7 +5291,7 @@ static int sceNetAdhocctlGetAddrByName(MIPSState *mips, const char *nickName, u3
 						if (peer->last_recv != 0 && strncmp((char *)&peer->nickname.data, nickName, ADHOCCTL_NICKNAME_LEN) == 0)
 						{
 							// Fake Receive Time
-							peer->last_recv = std::max(peer->last_recv, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
+							peer->last_recv = std::max<u64>(peer->last_recv, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
 
 							// Copy Peer Info
 							buf[discovered].nickname = peer->nickname;
@@ -5849,7 +5849,7 @@ int sceNetAdhocDiscoverUpdate(MIPSState *mips) {
 			case DiscoverPhase::Start:
 				discoverPhase = DiscoverPhase::Scanning;
 				delay = DiscoverRandomDelay();
-				discoverDeadline = now + (u64)(param ? param->timeoutSec : 0) * 1000000;
+				discoverDeadline = now + (u64)(param ? (u32)param->timeoutSec : 0) * 1000000;
 				break;
 			case DiscoverPhase::Scanning:
 				discoverPhase = DiscoverPhase::Hosting;

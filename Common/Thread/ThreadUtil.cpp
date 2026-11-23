@@ -57,7 +57,7 @@ void RegisterAttachDetach(AttachDetachFunc attach, AttachDetachFunc detach) {
 #include <pthread.h>
 #include <sys/types.h>
 #include <unistd.h>
-#if !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(WIIU)
 #include <sys/syscall.h>
 #endif // !PPSSPP_PLATFORM(SWITCH)
 #endif

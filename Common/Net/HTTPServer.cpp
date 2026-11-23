@@ -20,6 +20,9 @@
 #include <netinet/in.h>       /*  struct sockaddr_in        */
 #include <arpa/inet.h>        /*  inet (3) funtions         */
 #include <unistd.h>           /*  misc. UNIX functions      */
+#if PPSSPP_PLATFORM(WIIU)
+#include "Common/Net/WiiUSocketCompat.h"
+#endif
 
 #define closesocket close
 

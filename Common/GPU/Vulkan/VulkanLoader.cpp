@@ -32,7 +32,7 @@
 #include "Common/VR/VRVulkan.h"
 #include "Common/File/FileUtil.h"
 
-#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(WINDOWS) && !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 #include <dlfcn.h>
 #endif
 
@@ -248,7 +248,7 @@ PFN_vkGetRefreshCycleDurationGOOGLE vkGetRefreshCycleDurationGOOGLE;
 
 using namespace PPSSPP_VK;
 
-#if PPSSPP_PLATFORM(SWITCH)
+#if (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 typedef void *VulkanLibraryHandle;
 static VulkanLibraryHandle vulkanLibrary;
 #define dlsym(x, y) nullptr
@@ -265,7 +265,7 @@ bool g_vulkanAvailabilityChecked = false;
 bool g_vulkanMayBeAvailable = false;
 static std::string g_nativeLibDir;
 
-#if !PPSSPP_PLATFORM(SWITCH)
+#if !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 static PFN_vkVoidFunction LoadInstanceFunc(VkInstance instance, const char *name) {
 	PFN_vkVoidFunction funcPtr = vkGetInstanceProcAddr(instance, name);
 	if (!funcPtr) {
@@ -314,7 +314,7 @@ static PFN_vkVoidFunction LoadDeviceFuncCore(VkDevice device, const char *name, 
 #define LOAD_GLOBAL_FUNC(x) x = (PFN_ ## x)dlsym(vulkanLibrary, #x); if (!x) {INFO_LOG(Log::G3D,"Missing (global): %s", #x);}
 #define LOAD_GLOBAL_FUNC_LOCAL(lib, x) (PFN_ ## x)dlsym(lib, #x);
 
-#else // !PPSSPP_PLATFORM(SWITCH)
+#else // !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 // Just random stubs
 #define RTLD_NOW 0
 #define RTLD_LOCAL 1
@@ -327,7 +327,7 @@ static PFN_vkVoidFunction LoadDeviceFuncCore(VkDevice device, const char *name, 
 #define LOAD_GLOBAL_FUNC(x) x = (PFN_ ## x)NULL;
 
 #define LOAD_GLOBAL_FUNC_LOCAL(lib, x)  (PFN_ ## x)NULL;
-#endif // PPSSPP_PLATFORM(SWITCH)
+#endif // (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 
 static const char * const g_deviceNameBlacklist[] = {
 	"NVIDIA:SHIELD Tablet K1",
@@ -391,7 +391,7 @@ static void ForgetCustomDriver() {
 }
 
 static VulkanLibraryHandle VulkanLoadLibrary(std::string *errorString) {
-#if PPSSPP_PLATFORM(SWITCH)
+#if (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 	// Always unavailable, for now.
 	return nullptr;
 #elif PPSSPP_PLATFORM(UWP)
@@ -456,7 +456,7 @@ static VulkanLibraryHandle VulkanLoadLibrary(std::string *errorString) {
 
 static void VulkanFreeLibrary(VulkanLibraryHandle &h) {
 	if (h) {
-#if PPSSPP_PLATFORM(SWITCH)
+#if (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 		// Can't load, and can't free.
 #elif PPSSPP_PLATFORM(WINDOWS)
 		FreeLibrary(h);

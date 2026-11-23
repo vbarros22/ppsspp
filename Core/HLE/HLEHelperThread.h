@@ -25,7 +25,7 @@ class HLEHelperThread {
 public:
 	// For savestates.
 	HLEHelperThread() = default;
-	HLEHelperThread(const char *threadName, const u32 instructions[], u32 instrCount, u32 prio, int stacksize);
+	HLEHelperThread(const char *threadName, const u32_le instructions[], u32 instrCount, u32 prio, int stacksize);
 	HLEHelperThread(const char *threadName, const char *module, const char *func, u32 prio, int stacksize);
 	~HLEHelperThread();
 	void DoState(PointerWrap &p);

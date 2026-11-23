@@ -114,7 +114,7 @@ int NetSimTransport::PtpClose(int id) {
 	return inner_->PtpClose(id);
 }
 
-int NetSimTransport::PtpSend(int id, const char *data, int *len, int timeout, int flag) {
+int NetSimTransport::PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) {
 	AdhocSocket *sock = adhocSockets[id - 1];
 	std::deque<HeldSend> &held = sends_[sock];
 	u64 delayUs = Delay();

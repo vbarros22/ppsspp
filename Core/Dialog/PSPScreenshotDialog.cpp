@@ -43,7 +43,7 @@ static const int SCE_UTILITY_SCREENSHOTDIALOG_SIZE_V3 = 932;
 #if COMMON_LITTLE_ENDIAN
 typedef SceUtilityScreenshotType SceUtilityScreenshotType_le;
 #else
-typedef swap_struct_t<SceUtilityScreenshotType, swap_32_t<SceUtilityScreenshotType> > SceUtilityScreenshotType_le;
+typedef swap_t<SceUtilityScreenshotType> SceUtilityScreenshotType_le;
 #endif
 
 struct SceUtilityScreenshotParams {

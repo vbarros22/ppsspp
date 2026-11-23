@@ -145,7 +145,7 @@ void __KernelRegisterWaitTypeFuncs(WaitType type, WaitBeginCallbackFunc beginFun
 #if COMMON_LITTLE_ENDIAN
 typedef WaitType WaitType_le;
 #else
-typedef swap_struct_t<WaitType, swap_32_t<WaitType> > WaitType_le;
+typedef swap_t<WaitType> WaitType_le;
 #endif
 
 // Real PSP struct, don't change the fields.

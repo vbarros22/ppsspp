@@ -471,7 +471,7 @@ static u32 sceNetInetInetNtop(int af, u32 srcInAddrPtr, u32 dstBufPtr, u32 bufsi
 	return hleLogDebug(Log::sceNet, dstBufPtr, "%s", str);
 }
 
-static u32_le sceNetInetInetAddr(const char *hostname) {
+static u32 sceNetInetInetAddr(const char *hostname) {
 	hleEatMicro(INET_CONVERT_US);
 	u32 addr;
 	if (!hostname || !InetParseAton(hostname, &addr)) {
@@ -2039,7 +2039,7 @@ static bool ReadInetMsghdr(u32 msghdrPtr, InetMsghdr *msg, std::vector<HostIovec
 		(msg->msg_control && !InetValidRange(msg->msg_control, msg->msg_controllen, func, threadID))) {
 		return false;
 	}
-	iov->assign(msg->msg_iov ? msg->msg_iovlen : 0, HostIovec{});
+	iov->assign(msg->msg_iov ? (int)msg->msg_iovlen : 0, HostIovec{});
 	for (size_t i = 0; i < iov->size(); i++) {
 		const SceNetIovec &pspIov = ((const SceNetIovec *)Memory::GetPointerUnchecked(msg->msg_iov))[i];
 		if (!pspIov.iov_base) {
@@ -2050,7 +2050,7 @@ static bool ReadInetMsghdr(u32 msghdrPtr, InetMsghdr *msg, std::vector<HostIovec
 			return false;
 		}
 		char *base = (char *)Memory::GetPointerUnchecked(pspIov.iov_base);
-		const u32 len = receiving ? InetRecvSize(pspIov.iov_base, pspIov.iov_len) : pspIov.iov_len;
+		const u32 len = receiving ? InetRecvSize(pspIov.iov_base, pspIov.iov_len) : (u32)pspIov.iov_len;
 #if defined(_WIN32)
 		(*iov)[i].buf = base;
 		(*iov)[i].len = len;

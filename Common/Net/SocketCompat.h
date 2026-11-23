@@ -18,16 +18,21 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/select.h>
-#if !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(WIIU)
 #include <sys/mman.h>
 #endif
+#if !PPSSPP_PLATFORM(WIIU)
 #include <net/if.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#if !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(WIIU)
 #include <ifaddrs.h>
+#endif
+#if PPSSPP_PLATFORM(WIIU)
+#include "Common/Net/WiiUSocketCompat.h"
 #endif
 #include <fcntl.h>
 #endif

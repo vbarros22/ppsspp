@@ -507,7 +507,7 @@ typedef struct SceNetAdhocMatchingContext {
   SceNetAdhocMatchingHandler handler;
 
   // Event Handler Args
-  u32_le handlerArgs[6]; //MatchingArgs handlerArgs; // actual arguments only 5, the 6th one is just for borrowing a space to store the callback address to use later
+  u32 handlerArgs[6]; //MatchingArgs handlerArgs; // actual arguments only 5, the 6th one is just for borrowing a space to store the callback address to use later
   //SceNetAdhocMatchingHandlerArgs handlerArgs;
 
   // Hello Data Length

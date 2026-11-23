@@ -18,7 +18,7 @@
 #include "ppsspp_config.h"
 #include "Core/Instance.h"
 
-#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -56,7 +56,7 @@ static int hIDMapFile = -1;
 static long BUF_SIZE = 4096;
 #endif
 
-#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 #if PPSSPP_PLATFORM(MAC) || PPSSPP_PLATFORM(IOS)
 // flock() on shm fails with ENOTSUP on Darwin.
 static sem_t *counterLock = SEM_FAILED;
@@ -100,7 +100,7 @@ struct InstanceInfo {
 	int32_t pids[MAX_INSTANCE_IDS];
 };
 
-#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !PPSSPP_PLATFORM(SWITCH)
+#if !PPSSPP_PLATFORM(WINDOWS) && !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 #define HAS_INSTANCE_PIDS 1
 #else
 #define HAS_INSTANCE_PIDS 0
@@ -157,7 +157,7 @@ static bool UpdateInstanceCounter(void (*callback)(volatile InstanceInfo *)) {
 	UnmapViewOfFile(buf);
 
 	return result;
-#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || PPSSPP_PLATFORM(SWITCH)
+#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 	// TODO: replace shm_open & shm_unlink with ashmem or android-shmem
 	return false;
 #else
@@ -224,7 +224,7 @@ void InitInstanceCounter() {
 		PPSSPP_ID = 1;
 		return;
 	}
-#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || PPSSPP_PLATFORM(SWITCH)
+#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 	// TODO : replace shm_open & shm_unlink with ashmem or android-shmem
 #else
 	// Create shared memory object
@@ -303,7 +303,7 @@ void ShutdownInstanceCounter() {
 		CloseHandle(mapLock);
 		mapLock = nullptr;
 	}
-#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || PPSSPP_PLATFORM(SWITCH)
+#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 	// Do nothing
 #else
 	if (hIDMapFile >= 0) {
@@ -355,7 +355,7 @@ bool InitInstanceSync(const std::string &path, int index, int count) {
 	if (syncMapping) {
 		mem = MapViewOfFile(syncMapping, FILE_MAP_ALL_ACCESS, 0, 0, INSTANCE_SYNC_FILE_SIZE);
 	}
-#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || PPSSPP_PLATFORM(SWITCH)
+#elif PPSSPP_PLATFORM(ANDROID) || defined(__LIBRETRO__) || (PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 	// Not needed there: the instances run on a desktop.
 #else
 	int fd = open(path.c_str(), O_RDWR);
@@ -392,7 +392,7 @@ void ShutdownInstanceSync() {
 		syncSlots[syncIndex - 1].store(SYNC_LEFT);
 #if PPSSPP_PLATFORM(WINDOWS)
 		UnmapViewOfFile(syncSlots);
-#elif !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !PPSSPP_PLATFORM(SWITCH)
+#elif !PPSSPP_PLATFORM(ANDROID) && !defined(__LIBRETRO__) && !(PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU))
 		munmap(syncSlots, INSTANCE_SYNC_FILE_SIZE);
 #endif
 		syncSlots = nullptr;

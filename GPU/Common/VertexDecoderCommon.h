@@ -472,5 +472,7 @@ public:
 	}
 	void Clear() {}
 	bool IsInSpace(const u8 *ptr) const { return false; }
+	// Never "full": Compile just declines, and the interpreter is used.
+	size_t GetSpaceLeft() const { return (size_t)-1; }
 };
 #endif

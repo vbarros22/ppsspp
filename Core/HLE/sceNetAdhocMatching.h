@@ -23,7 +23,7 @@
 #pragma pack(push,1)
 #endif
 typedef struct MatchingArgs {
-	u32_le data[6]; // ContextID, EventID, bufAddr[ to MAC], OptLen, OptAddr[, EntryPoint]
+	u32 data[6]; // ContextID, EventID, bufAddr[ to MAC], OptLen, OptAddr[, EntryPoint]
 } PACK MatchingArgs;
 #ifdef _MSC_VER
 #pragma pack(pop)

@@ -1,6 +1,6 @@
 set(ARMIPS_REGEXP OFF CACHE BOOL "" FORCE)
 set(ARMIPS_LIBRARY_ONLY ON CACHE BOOL "" FORCE)
-if(WIN32)
+if(WIN32 OR WIIU)
 	set(ARMIPS_USE_STD_FILESYSTEM ON CACHE BOOL "" FORCE)
 endif()
 
@@ -36,13 +36,21 @@ endif()
 set(SKIP_GLSLANG_INSTALL ON CACHE BOOL "" FORCE)
 set(ENABLE_GLSLANG_INSTALL OFF)
 
-# When compiling for the Switch (libnx), fake UNIX for glslang to compile Unix's OSDependent
-if (USE_LIBNX)
+# When compiling for the Switch (libnx) or the Wii U, fake UNIX for glslang to compile Unix's OSDependent
+if (USE_LIBNX OR WIIU)
 	set(UNIX ON CACHE BOOL "" FORCE)
 endif()
 add_subdirectory(glslang EXCLUDE_FROM_ALL)
-if (USE_LIBNX)
+if (USE_LIBNX OR WIIU)
 	unset(UNIX CACHE)
+endif()
+if (WIIU)
+	# Wii U executables (RPX) don't support PIC relocations.
+	foreach(tgt GenericCodeGen MachineIndependent OSDependent OGLCompiler glslang SPIRV)
+		if (TARGET ${tgt})
+			set_property(TARGET ${tgt} PROPERTY POSITION_INDEPENDENT_CODE OFF)
+		endif()
+	endforeach()
 endif()
 
 add_subdirectory(snappy)
@@ -90,7 +98,7 @@ if(WIN32)
 	)
 endif()
 
-if(LINUX OR ANDROID OR MACOSX OR IOS OR BSD)
+if(LINUX OR ANDROID OR MACOSX OR IOS OR BSD OR WIIU)
 	list(APPEND aemu_postoffice_client_obj
 		aemu_postoffice/client/sock_impl_linux.c
 	)
@@ -116,7 +124,7 @@ if(WIN32)
 	)
 endif()
 
-if(LINUX OR ANDROID OR MACOSX OR IOS OR BSD)
+if(LINUX OR ANDROID OR MACOSX OR IOS OR BSD OR WIIU)
 	list(APPEND aemu_postoffice_server_obj
 		aemu_postoffice/server_cpp/native_socket_linux.cpp
 	)
@@ -159,4 +167,10 @@ if(ANDROID)
     if (ARM64)
         add_subdirectory(libadrenotools)
     endif()
+endif()
+
+if(WIIU)
+	foreach(tgt aemu_postoffice_client aemu_postoffice_server)
+		target_compile_options(${tgt} PRIVATE -include ${CMAKE_SOURCE_DIR}/Common/Net/WiiUSocketCompat.h)
+	endforeach()
 endif()

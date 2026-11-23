@@ -243,8 +243,9 @@ struct NpMatching2Handler {
 //		0xa102 with 0x120b.
 // Arg5 seems to be boolean (0/1), mostly 0, conditional when Arg1=0x0001
 // Arg7 seems to be integer/state? (0..2), mostly 0, conditional when Arg1=0x0108 (0 on SendRoomMessage, 2 on others), 1 when Arg1=0xa102
+// Host-side arguments for hleEnqueueCall, never in PSP memory: native ints.
 struct NpMatching2Args {
-	u32_le data[11]; // 7 elements (excluding optional data)? or may be 11 elements (including optional data)?
+	u32 data[11]; // 7 elements (excluding optional data)? or may be 11 elements (including optional data)?
 	// May be followed by optional data? since these Args usually created on the stack
 };
 

@@ -74,6 +74,8 @@ if(CMAKE_SYSTEM_PROCESSOR)
 	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^loongarch64")
 		set(LOONGARCH64_DEVICE ON)
 		add_compile_options(-mlsx)
+	elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "^ppc$" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "^powerpc$")
+		set(POWERPC_DEVICE ON)
 	else()
 		message("Unknown CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
 	endif()
@@ -97,6 +99,20 @@ endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 	set(ANDROID ON)
+endif()
+
+# Wii U (devkitPro wut toolchain): GX2 only, no GL or Vulkan.
+if(WIIU)
+	set(NO_OPENGL ON)
+	set(ARM_NO_VULKAN ON)
+	# No mmap/shared memory views: PSP memory is one plain allocation.
+	set(USE_NO_MMAP ON CACHE BOOL "" FORCE)
+	# No dynamic loading.
+	set(CMAKE_DL_LIBS "")
+	# RPX executables only support the global-dynamic TLS model (thread_local).
+	add_compile_options(-ftls-model=global-dynamic)
+	# The Wii U network stack has no IPv6.
+	add_compile_definitions(ENET_IPV4_ONLY)
 endif()
 
 # We only support Vulkan on Unix, macOS (by MoltenVK), Android and Windows.

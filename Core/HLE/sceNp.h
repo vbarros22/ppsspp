@@ -315,12 +315,13 @@ struct NpAuthHandler {
 	u32 argument;
 };
 
+// Host-side arguments for hleEnqueueCall, never in PSP memory: native ints.
 union NpAuthArgs {
-	u32_le data[3]; // id, result, ArgAddr
+	u32 data[3]; // id, result, ArgAddr
 	struct {
-		s32_le id;
-		s32_le result;
-		u32_le argAddr;
+		s32 id;
+		s32 result;
+		u32 argAddr;
 	};
 };
 

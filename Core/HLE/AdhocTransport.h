@@ -95,12 +95,12 @@ public:
 	// Closes it and frees its slot.
 	virtual int PtpClose(int id) = 0;
 	// The rest of sceNetAdhocPtpSend / PtpRecv / PtpAccept, and their blocking retries.
-	virtual int PtpSend(int id, const char *data, int *len, int timeout, int flag) = 0;
+	virtual int PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) = 0;
 	// Sends what it can of data at once, from outside a syscall (the network simulation's delayed sends):
 	// the bytes sent, 0 if none can go now, < 0 if the connection is gone.
 	virtual int PtpSendNow(int id, const char *data, int len) = 0;
-	virtual int PtpRecv(int id, void *buf, int *len, int timeout, int flag) = 0;
-	virtual int PtpAccept(int id, SceNetEtherAddr *addr, uint16_t *port, int timeout, int flag) = 0;
+	virtual int PtpRecv(int id, void *buf, s32_le *len, int timeout, int flag) = 0;
+	virtual int PtpAccept(int id, SceNetEtherAddr *addr, u16_le *port, int timeout, int flag) = 0;
 	virtual int DoBlockingPtpSend(AdhocSocketRequest &req, s64 &result) = 0;
 	virtual int DoBlockingPtpRecv(AdhocSocketRequest &req, s64 &result) = 0;
 	virtual int DoBlockingPtpAccept(AdhocSocketRequest &req, s64 &result) = 0;
@@ -176,10 +176,10 @@ public:
 	int PtpOpen(const SceNetEtherAddr *saddr, int sport, const SceNetEtherAddr *daddr, int dport, int bufsize, int rexmt_int, int rexmt_cnt, int flag) override;
 	int PtpListen(const SceNetEtherAddr *saddr, int sport, int bufsize, int rexmt_int, int rexmt_cnt, int backlog, bool isClient, int flag) override;
 	int PtpClose(int id) override;
-	int PtpSend(int id, const char *data, int *len, int timeout, int flag) override;
+	int PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) override;
 	int PtpSendNow(int id, const char *data, int len) override;
-	int PtpRecv(int id, void *buf, int *len, int timeout, int flag) override;
-	int PtpAccept(int id, SceNetEtherAddr *addr, uint16_t *port, int timeout, int flag) override;
+	int PtpRecv(int id, void *buf, s32_le *len, int timeout, int flag) override;
+	int PtpAccept(int id, SceNetEtherAddr *addr, u16_le *port, int timeout, int flag) override;
 	int DoBlockingPtpSend(AdhocSocketRequest &req, s64 &result) override;
 	int DoBlockingPtpRecv(AdhocSocketRequest &req, s64 &result) override;
 	int DoBlockingPtpAccept(AdhocSocketRequest &req, s64 &result) override;
@@ -212,10 +212,10 @@ public:
 	int PtpOpen(const SceNetEtherAddr *saddr, int sport, const SceNetEtherAddr *daddr, int dport, int bufsize, int rexmt_int, int rexmt_cnt, int flag) override;
 	int PtpListen(const SceNetEtherAddr *saddr, int sport, int bufsize, int rexmt_int, int rexmt_cnt, int backlog, bool isClient, int flag) override;
 	int PtpClose(int id) override;
-	int PtpSend(int id, const char *data, int *len, int timeout, int flag) override;
+	int PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) override;
 	int PtpSendNow(int id, const char *data, int len) override;
-	int PtpRecv(int id, void *buf, int *len, int timeout, int flag) override;
-	int PtpAccept(int id, SceNetEtherAddr *addr, uint16_t *port, int timeout, int flag) override;
+	int PtpRecv(int id, void *buf, s32_le *len, int timeout, int flag) override;
+	int PtpAccept(int id, SceNetEtherAddr *addr, u16_le *port, int timeout, int flag) override;
 	int DoBlockingPtpSend(AdhocSocketRequest &req, s64 &result) override;
 	int DoBlockingPtpRecv(AdhocSocketRequest &req, s64 &result) override;
 	int DoBlockingPtpAccept(AdhocSocketRequest &req, s64 &result) override;
@@ -257,10 +257,10 @@ public:
 	int PtpOpen(const SceNetEtherAddr *saddr, int sport, const SceNetEtherAddr *daddr, int dport, int bufsize, int rexmt_int, int rexmt_cnt, int flag) override { return inner_->PtpOpen(saddr, sport, daddr, dport, bufsize, rexmt_int, rexmt_cnt, flag); }
 	int PtpListen(const SceNetEtherAddr *saddr, int sport, int bufsize, int rexmt_int, int rexmt_cnt, int backlog, bool isClient, int flag) override { return inner_->PtpListen(saddr, sport, bufsize, rexmt_int, rexmt_cnt, backlog, isClient, flag); }
 	int PtpClose(int id) override;
-	int PtpSend(int id, const char *data, int *len, int timeout, int flag) override;
+	int PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) override;
 	int PtpSendNow(int id, const char *data, int len) override { return inner_->PtpSendNow(id, data, len); }
-	int PtpRecv(int id, void *buf, int *len, int timeout, int flag) override { return inner_->PtpRecv(id, buf, len, timeout, flag); }
-	int PtpAccept(int id, SceNetEtherAddr *addr, uint16_t *port, int timeout, int flag) override { return inner_->PtpAccept(id, addr, port, timeout, flag); }
+	int PtpRecv(int id, void *buf, s32_le *len, int timeout, int flag) override { return inner_->PtpRecv(id, buf, len, timeout, flag); }
+	int PtpAccept(int id, SceNetEtherAddr *addr, u16_le *port, int timeout, int flag) override { return inner_->PtpAccept(id, addr, port, timeout, flag); }
 	int DoBlockingPtpSend(AdhocSocketRequest &req, s64 &result) override { return inner_->DoBlockingPtpSend(req, result); }
 	int DoBlockingPtpRecv(AdhocSocketRequest &req, s64 &result) override { return inner_->DoBlockingPtpRecv(req, result); }
 	int DoBlockingPtpAccept(AdhocSocketRequest &req, s64 &result) override { return inner_->DoBlockingPtpAccept(req, result); }

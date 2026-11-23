@@ -3965,7 +3965,7 @@ std::vector<DebugThreadInfo> GetThreadsInfo() {
 		info.id = uid;
 		strncpy(info.name,t->GetName(),KERNELOBJECT_MAX_NAME_LENGTH);
 		info.name[KERNELOBJECT_MAX_NAME_LENGTH] = 0;
-		info.status = (ThreadStatus)t->nt.status;
+		info.status = (ThreadStatus)(u32)t->nt.status;
 		info.entrypoint = t->nt.entrypoint;
 		info.initialStack = t->nt.initialStack;
 		info.stackSize = (u32)t->nt.stackSize;

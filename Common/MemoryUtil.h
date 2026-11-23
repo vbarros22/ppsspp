@@ -18,7 +18,7 @@
 #pragma once
 
 #ifndef _WIN32
-#ifndef __SWITCH__
+#if !defined(__SWITCH__) && !defined(__WIIU__)
 #include <sys/mman.h>
 #endif // !__SWITCH__
 #endif

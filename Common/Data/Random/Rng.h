@@ -56,7 +56,7 @@ public:
 		// same as twisting the whole array in one go, and it matches what hardware leaves
 		// behind in the context after each draw.
 		// The context can live in emulated memory, so don't trust the index.
-		const uint32_t i = index_ % MT_SIZE;
+		const uint32_t i = (uint32_t)index_ % MT_SIZE;
 		uint32_t y = mt_[i];
 		twist(i);
 		index_ = (i + 1) % MT_SIZE;

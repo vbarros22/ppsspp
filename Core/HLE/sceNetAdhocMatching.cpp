@@ -82,11 +82,11 @@ void __UpdateMatchingHandler(const MatchingArgs &ArgsPtr) {
 // Matching callback is void function: typedef void(*SceNetAdhocMatchingHandler)(int id, int event, SceNetEtherAddr * peer, int optlen, void * opt);
 // Important! The MIPS call need to be fully executed before the next MIPS call invoked, as the game (ie. DBZ Tag Team) may need to prepare something for the next callback event to use
 // Note: Must not lock peerlock within this function to prevent race-condition with other thread whos owning peerlock and trying to lock context->eventlock owned by this thread
-void notifyMatchingHandler(SceNetAdhocMatchingContext * context, ThreadMessage * msg, void * opt, u32_le &bufAddr, u32_le &bufLen, u32_le * args) {
+void notifyMatchingHandler(SceNetAdhocMatchingContext * context, ThreadMessage * msg, void * opt, u32 &bufAddr, u32 &bufLen, u32 * args) {
 	// Don't share buffer address space with other mipscall in the queue since mipscalls aren't immediately executed
 	MatchingArgs argsNew = { 0 };
-	u32_le dataBufLen = msg->optlen + 8; //max(bufLen, msg->optlen + 8);
-	u32_le dataBufAddr = userMemory.Alloc(dataBufLen); // We will free this memory after returning from mipscall. FIXME: Are these buffers supposed to be taken/pre-allocated from the memory pool during sceNetAdhocMatchingInit?
+	u32 dataBufLen = msg->optlen + 8; //max(bufLen, msg->optlen + 8);
+	u32 dataBufAddr = userMemory.Alloc(dataBufLen); // We will free this memory after returning from mipscall. FIXME: Are these buffers supposed to be taken/pre-allocated from the memory pool during sceNetAdhocMatchingInit?
 	uint8_t *dataPtr = Memory::GetPointerWriteRangeOrException(dataBufAddr, dataBufLen);
 	if (dataPtr) {
 		memcpy(dataPtr, &msg->mac, sizeof(msg->mac));
@@ -452,7 +452,7 @@ void sendBulkDataPacket(SceNetAdhocMatchingContext * context, SceNetEtherAddr * 
 	// A peer that has left the group can't acknowledge, so DATA_TIMEOUT comes once the retransmissions
 	// have run out (pspautotests net/adhoc/pair/vanish).
 	if (peerLeftAt(mac) != 0) {
-		peer->dataTimeoutAt = CoreTiming::GetGlobalTimeUsScaled() + (u64)context->resend_int * (u64)std::max(1, context->resendcounter);
+		peer->dataTimeoutAt = CoreTiming::GetGlobalTimeUsScaled() + (u64)context->resend_int * (u64)std::max<int>(1, context->resendcounter);
 		return;
 	}
 	spawnLocalEvent(context, PSP_ADHOC_MATCHING_EVENT_DATA_ACK, mac, 0, NULL);
@@ -1188,7 +1188,7 @@ void actOnByePacket(SceNetAdhocMatchingContext * context, SceNetEtherAddr * send
 static void matchingDeliverEvents(SceNetAdhocMatchingContext *context) {
 	u32 bufLen = context->rxbuflen;
 	u32 bufAddr = 0;
-	u32_le *args = context->handlerArgs;
+	u32 *args = context->handlerArgs;
 
 	std::lock_guard<std::recursive_mutex> guard(*context->eventlock);
 	while (context->event_stack != NULL) {
@@ -1283,7 +1283,7 @@ static void matchingHandleInput(SceNetAdhocMatchingContext *context) {
 			now = CoreTiming::GetGlobalTimeUsScaled();
 			s64 delta = now - peer->last_recv;
 			DEBUG_LOG(Log::sceNet, "Timestamp LastRecv Delta: %lld (%llu - %llu) from %s", delta, now, peer->last_recv, mac2str(&sendermac).c_str());
-			if (peer->last_recv != 0) peer->last_recv = std::max(peer->last_recv, now - defaultLastRecvDelta);
+			if (peer->last_recv != 0) peer->last_recv = std::max<u64>(peer->last_recv, now - defaultLastRecvDelta);
 		} else {
 			WARN_LOG(Log::sceNet, "InputLoop[%d]: Unknown Peer[%s:%u] (Recved=%i, Length=%i)", context->id, mac2str(&sendermac).c_str(), senderport, recvresult, rxbuflen);
 		}
@@ -2189,7 +2189,7 @@ static int sceNetAdhocMatchingGetMembers(int matchingId, u32 sizeAddr, u32 buf) 
 	if (!Memory::IsValidAddress(sizeAddr))
 		return hleLogError(Log::sceNet, SCE_NET_ADHOC_MATCHING_ERROR_INVALID_ARG, "adhocmatching invalid arg");
 
-	int *buflen = (int*)Memory::GetPointerUnchecked(sizeAddr);
+	s32_le *buflen = (s32_le *)Memory::GetPointerUnchecked(sizeAddr);
 	SceNetAdhocMatchingMemberInfoEmu* buf2 = NULL;
 	if (Memory::IsValidAddress(buf)) {
 		buf2 = (SceNetAdhocMatchingMemberInfoEmu*)Memory::GetPointerUnchecked(buf);
@@ -2254,7 +2254,7 @@ static int sceNetAdhocMatchingGetMembers(int matchingId, u32 sizeAddr, u32 buf) 
 						// Faking lastping
 						auto friendpeer = findFriend(&p2p->mac);
 						if (p2p->lastping != 0 && friendpeer != NULL && friendpeer->last_recv != 0)
-							p2p->lastping = std::max(p2p->lastping, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
+							p2p->lastping = std::max<u64>(p2p->lastping, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
 						else
 							p2p->lastping = 0;
 
@@ -2273,7 +2273,7 @@ static int sceNetAdhocMatchingGetMembers(int matchingId, u32 sizeAddr, u32 buf) 
 						// Faking lastping
 						auto friendpeer = findFriend(&parentpeer->mac);
 						if (parentpeer->lastping != 0 && friendpeer != NULL && friendpeer->last_recv != 0)
-							parentpeer->lastping = std::max(parentpeer->lastping, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
+							parentpeer->lastping = std::max<u64>(parentpeer->lastping, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
 						else
 							parentpeer->lastping = 0;
 
@@ -2294,7 +2294,7 @@ static int sceNetAdhocMatchingGetMembers(int matchingId, u32 sizeAddr, u32 buf) 
 							// Faking lastping
 							auto friendpeer = findFriend(&peer->mac);
 							if (peer->lastping != 0 && friendpeer != NULL && friendpeer->last_recv != 0)
-								peer->lastping = std::max(peer->lastping, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
+								peer->lastping = std::max<u64>(peer->lastping, CoreTiming::GetGlobalTimeUsScaled() - defaultLastRecvDelta);
 							else
 								peer->lastping = 0;
 
@@ -2535,7 +2535,7 @@ void __NetMatchingCallbacks() { //(int matchingId)
 
 	auto params = matchingEvents.begin();
 	if (params != matchingEvents.end()) {
-		u32_le args[6];
+		u32 args[6];
 		memcpy(args, params->data, sizeof(args));
 		auto context = findMatchingContext(args[0]);
 

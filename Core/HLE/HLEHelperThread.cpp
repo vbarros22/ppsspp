@@ -27,7 +27,7 @@
 #include "Core/MIPS/MIPS.h"
 #include "Core/MIPS/MIPSCodeUtils.h"
 
-HLEHelperThread::HLEHelperThread(const char *threadName, const u32 instructions[], u32 instrCount, u32 prio, int stacksize) {
+HLEHelperThread::HLEHelperThread(const char *threadName, const u32_le instructions[], u32 instrCount, u32 prio, int stacksize) {
 	u32 instrBytes = instrCount * sizeof(u32);
 	u32 totalBytes = instrBytes + sizeof(u32) * 2;
 	AllocEntry(totalBytes);

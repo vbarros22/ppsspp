@@ -223,7 +223,7 @@ int RelayTransport::PdpSendTo(int id, const SceNetEtherAddr *mac, uint16_t dport
 	return SOCKET_ERROR;
 }
 
-static int ptp_send_postoffice(int idx, const void *data, int *len) {
+static int ptp_send_postoffice(int idx, const void *data, s32_le *len) {
 	// Out of the group, the send succeeds and the data goes nowhere (pspautotests net/adhoc/pair/vanish),
 	// whatever became of the relay meanwhile.
 	if (offAdhocNetwork()) {
@@ -265,14 +265,16 @@ static int ptp_send_postoffice(int idx, const void *data, int *len) {
 	}
 	if (ptp_send_status == AEMU_POSTOFFICE_CLIENT_OUT_OF_MEMORY) {
 		// this is pretty critical
-		ERROR_LOG(Log::sceNet, "%s: critical: huge client buf %d what is going on please fix", __func__, len ? *len : 0);
+		ERROR_LOG(Log::sceNet, "%s: critical: huge client buf %d what is going on please fix", __func__, len ? (int)*len : 0);
 	}
 
 	return 0;
 }
 
 int RelayTransport::PtpSendNow(int id, const char *data, int len) {
-	int result = ptp_send_postoffice(id - 1, data, &len);
+	s32_le lenValue = len;
+	int result = ptp_send_postoffice(id - 1, data, &lenValue);
+	len = lenValue;
 	if (result == 0) {
 		return len;
 	}
@@ -386,7 +388,7 @@ static size_t relayPtpReadable(const RelayPtpQueue &queue) {
 	return bytes == 0 ? 0 : bytes - queue.offset;
 }
 
-static int ptp_recv_postoffice(int idx, void *data, int *len) {
+static int ptp_recv_postoffice(int idx, void *data, s32_le *len) {
 	// Out of the group, nothing arrives, and the connection doesn't fail either (pspautotests
 	// net/adhoc/pair/vanish), whatever became of the relay meanwhile.
 	if (offAdhocNetwork()) {
@@ -419,7 +421,7 @@ static int ptp_recv_postoffice(int idx, void *data, int *len) {
 		return SCE_NET_ADHOC_ERROR_WOULD_BLOCK;
 	}
 
-	size_t want = std::min((size_t)std::max(*len, 0), readable);
+	size_t want = std::min((size_t)std::max<int>(*len, 0), readable);
 	size_t copied = 0;
 	while (copied < want) {
 		RelayPtpBlock &block = queue.blocks.front();
@@ -618,7 +620,7 @@ void RelayTransport::Poll() {
 	InstanceSyncStandAside(false);
 }
 
-static int ptp_accept_postoffice(int idx, SceNetEtherAddr *saddr, uint16_t *sport) {
+static int ptp_accept_postoffice(int idx, SceNetEtherAddr *saddr, u16_le *sport) {
 	fillRelayBacklog(idx);
 	RelayBacklog &backlog = relayBacklogs[adhocSockets[idx]];
 	if (backlog.pending.empty()) {
@@ -993,7 +995,7 @@ int RelayTransport::PtpOpen(const SceNetEtherAddr *saddr, int sport, const SceNe
 	return ptp_open_postoffice(saddr, sport, daddr, dport, bufsize, rexmt_int, rexmt_cnt);
 }
 
-int RelayTransport::PtpAccept(int id, SceNetEtherAddr *addr, uint16_t *port, int timeout, int flag) {
+int RelayTransport::PtpAccept(int id, SceNetEtherAddr *addr, u16_le *port, int timeout, int flag) {
 	int newsocket = ptp_accept_postoffice(id - 1, addr, port);
 	if (newsocket >= 0) {
 		return newsocket;
@@ -1096,7 +1098,7 @@ int RelayTransport::PtpListen(const SceNetEtherAddr *saddr, int sport, int bufsi
 	return id;
 }
 
-int RelayTransport::PtpSend(int id, const char *data, int *len, int timeout, int flag) {
+int RelayTransport::PtpSend(int id, const char *data, s32_le *len, int timeout, int flag) {
 	auto& ptpsocket = adhocSockets[id - 1]->data.ptp;
 	int sent = ptp_send_postoffice(id - 1, data, len);
 	if (sent == 0) {
@@ -1117,7 +1119,7 @@ int RelayTransport::PtpSend(int id, const char *data, int *len, int timeout, int
 	return WaitBlockingAdhocSocket(threadSocketId, PTP_SEND, id, (void*)data, len, timeout, nullptr, nullptr, "ptp send");
 }
 
-int RelayTransport::PtpRecv(int id, void *buf, int *len, int timeout, int flag) {
+int RelayTransport::PtpRecv(int id, void *buf, s32_le *len, int timeout, int flag) {
 	auto& ptpsocket = adhocSockets[id - 1]->data.ptp;
 	int received = ptp_recv_postoffice(id - 1, buf, len);
 	if (received == 0) {

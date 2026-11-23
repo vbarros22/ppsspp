@@ -73,8 +73,9 @@ struct ApctlHandler {
 	u32 argument;
 };
 
+// Host-side arguments for hleEnqueueCall, never in PSP memory: native ints.
 struct ApctlArgs {
-	u32_le data[5]; // OldState, NewState, Event, Error, ArgsAddr
+	u32 data[5]; // OldState, NewState, Event, Error, ArgsAddr
 };
 
 class PointerWrap;

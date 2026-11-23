@@ -1609,8 +1609,10 @@ Draw::Texture *FramebufferManagerCommon::MakePixelTexture(const u8 *srcPixels, G
 	// Could share code with the texture cache perhaps.
 	auto generateTexture = [&](uint8_t *data, const uint8_t *initData, uint32_t w, uint32_t h, uint32_t d, uint32_t byteStride, uint32_t sliceByteStride) {
 		for (int y = 0; y < height; y++) {
-			const u16_le *src16 = (const u16_le *)srcPixels + srcStride * y;
-			const u32_le *src32 = (const u32_le *)srcPixels + srcStride * y;
+			// TODO(big-endian): The color converters take native u16/u32, but this is PSP memory
+			// (little-endian). Fine on little-endian hosts; on big-endian they need swapping variants.
+			const u16 *src16 = (const u16 *)srcPixels + srcStride * y;
+			const u32 *src32 = (const u32 *)srcPixels + srcStride * y;
 			u32 *dst = (u32 *)(data + byteStride * y);
 			u16 *dst16 = (u16 *)(data + byteStride * y);
 			u8 *dst8 = (u8 *)(data + byteStride * y);

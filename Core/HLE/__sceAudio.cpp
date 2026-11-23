@@ -453,7 +453,7 @@ static bool __AudioSRCReadSample(const AudioSRCChannel &chan, int bufIndex, u32 
 	}
 	const s16_le *src = (const s16_le *)Memory::GetPointerUnchecked(addr);
 	l = src[0];
-	r = mono ? l : src[1];
+	r = mono ? l : (int)src[1];
 	return true;
 }
 

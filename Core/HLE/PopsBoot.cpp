@@ -616,7 +616,7 @@ bool __PopsBootStartInit(FileLoader *pbp, const std::string &gamePath, std::stri
 	// The kernel's init: get the version key through the registered function, if any, then
 	// scePopsManLoadModule(path, loadArg). Starts with a1 = its copy of the path, below the manager's
 	// priority so it runs once module_start is done.
-	const u32 code[] = {
+	const u32_le code[] = {
 		0x00A08021,                // move s0, a1
 		0x03E08821,                // move s1, ra
 		0x3C190000 | (((keyFuncSlot + 0x8000) >> 16) & 0xFFFF),  // lui t9, slot

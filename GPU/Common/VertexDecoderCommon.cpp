@@ -323,7 +323,14 @@ void VertexDecoder::Step_WeightsU16Skin(const VertexDecoder *dec, const u8 *ptr,
 
 void VertexDecoder::Step_WeightsFloatSkin(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
 	const float_le *wdata = (const float_le *)(ptr);
+#if COMMON_LITTLE_ENDIAN
 	dec->ComputeSkinMatrix(wdata);
+#else
+	float weights[8];
+	for (int j = 0; j < dec->nweights; j++)
+		weights[j] = wdata[j];
+	dec->ComputeSkinMatrix(weights);
+#endif
 }
 
 void VertexDecoder::Step_TcU8ToFloat(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
@@ -733,7 +740,8 @@ void VertexDecoder::Step_NormalS16Skin(const VertexDecoder *dec, const u8 *ptr, 
 
 void VertexDecoder::Step_NormalFloatSkin(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
 	float *normal = (float *)(decoded + dec->decFmt.nrmoff);
-	const float_le *fn = (const float_le *)(ptr + dec->nrmoff);
+	const float_le *fnle = (const float_le *)(ptr + dec->nrmoff);
+	const float fn[3] = { fnle[0], fnle[1], fnle[2] };
 	Norm3ByMatrix43(normal, fn, skinMatrix);
 }
 
@@ -890,7 +898,8 @@ void VertexDecoder::Step_PosS16Skin(const VertexDecoder *dec, const u8 *ptr, u8 
 void VertexDecoder::Step_PosFloatSkin(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
 	// TODO: Clean for NaN/INF here.
 	float *pos = (float *)(decoded + dec->decFmt.posoff);
-	const float_le *fn = (const float_le *)(ptr + dec->posoff);
+	const float_le *fnle = (const float_le *)(ptr + dec->posoff);
+	const float fn[3] = { fnle[0], fnle[1], fnle[2] };
 	Vec3ByMatrix43(pos, fn, skinMatrix);
 }
 

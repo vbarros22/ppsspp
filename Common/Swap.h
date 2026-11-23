@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <cstring>
+#include <type_traits>
+
 #include <cstdlib>
 
 #include "Common/CommonTypes.h"
@@ -118,7 +121,9 @@ public:
 	T const swap() const {
 		return swap(value);
 	}
-	swap_struct_t() : value((T)0) {}
+	// Trivial (uninitialized, like the plain integer it stands in for), so structs made of
+	// these stay trivially copyable on big-endian hosts too: savestates, unions, memcpy.
+	swap_struct_t() = default;
 	swap_struct_t(const T &v): value(swap(v)) {}
 
 	template <typename S>
@@ -536,6 +541,51 @@ struct swap_double_t {
 	}
 };
 
+// Lean little-endian storage type for big-endian hosts (used for the *_le typedefs there).
+// Unlike swap_struct_t it has exactly one conversion, to T, so it mixes with plain
+// arithmetic, bool contexts and enums without ambiguity. It's trivial, so structs of these
+// stay trivially copyable (memcpy, unions, savestates keep the PSP's byte layout).
+template <typename T>
+struct swap_t {
+	static_assert(std::is_arithmetic<T>::value || std::is_enum<T>::value, "swap_t needs a scalar type");
+	static_assert(sizeof(T) == 2 || sizeof(T) == 4 || sizeof(T) == 8, "swap_t needs a 2, 4 or 8 byte type");
+
+private:
+	T swapped;
+
+	static constexpr T swap(T v) {
+		if constexpr (sizeof(T) == 2) {
+			return __builtin_bit_cast(T, __builtin_bswap16(__builtin_bit_cast(u16, v)));
+		} else if constexpr (sizeof(T) == 4) {
+			return __builtin_bit_cast(T, __builtin_bswap32(__builtin_bit_cast(u32, v)));
+		} else {
+			return __builtin_bit_cast(T, __builtin_bswap64(__builtin_bit_cast(u64, v)));
+		}
+	}
+
+public:
+	swap_t() = default;
+	constexpr swap_t(T v) : swapped(swap(v)) {}
+
+	constexpr operator T() const { return swap(swapped); }
+
+	swap_t &operator=(T v) { swapped = swap(v); return *this; }
+	swap_t &operator&=(T v) { return *this = (T)(*this & v); }
+	swap_t &operator|=(T v) { return *this = (T)(*this | v); }
+	swap_t &operator^=(T v) { return *this = (T)(*this ^ v); }
+	swap_t &operator+=(T v) { return *this = (T)(*this + v); }
+	swap_t &operator-=(T v) { return *this = (T)(*this - v); }
+	swap_t &operator*=(T v) { return *this = (T)(*this * v); }
+	swap_t &operator/=(T v) { return *this = (T)(*this / v); }
+	swap_t &operator%=(T v) { return *this = (T)(*this % v); }
+	swap_t &operator<<=(int v) { return *this = (T)(*this << v); }
+	swap_t &operator>>=(int v) { return *this = (T)(*this >> v); }
+	swap_t &operator++() { return *this += 1; }
+	swap_t &operator--() { return *this -= 1; }
+	T operator++(int) { T old = *this; *this += 1; return old; }
+	T operator--(int) { T old = *this; *this -= 1; return old; }
+};
+
 #if COMMON_LITTLE_ENDIAN
 typedef u32 u32_le;
 typedef u16 u16_le;
@@ -561,17 +611,17 @@ typedef swap_struct_t<float, swap_float_t<float> > float_be;
 typedef swap_struct_t<double, swap_double_t<double> > double_be;
 #else
 
-typedef swap_struct_t<u64, swap_64_t<u64>> u64_le;
-typedef swap_struct_t<s64, swap_64_t<s64>> s64_le;
+typedef swap_t<u64> u64_le;
+typedef swap_t<s64> s64_le;
 
-typedef swap_struct_t<u32, swap_32_t<u32>> u32_le;
-typedef swap_struct_t<s32, swap_32_t<s32>> s32_le;
+typedef swap_t<u32> u32_le;
+typedef swap_t<s32> s32_le;
 
-typedef swap_struct_t<u16, swap_16_t<u16>> u16_le;
-typedef swap_struct_t<s16, swap_16_t<s16>> s16_le;
+typedef swap_t<u16> u16_le;
+typedef swap_t<s16> s16_le;
 
-typedef swap_struct_t<float, swap_float_t<float> > float_le;
-typedef swap_struct_t<double, swap_double_t<double> > double_le;
+typedef swap_t<float> float_le;
+typedef swap_t<double> double_le;
 
 typedef u32 u32_be;
 typedef u16 u16_be;

@@ -189,7 +189,7 @@ size_t LocalFileLoader::ReadAt(s64 absolutePos, size_t bytes, size_t count, void
 	std::lock_guard<std::mutex> guard(readLock_);
 	File::Fseek(file_, absolutePos, SEEK_SET);
 	return fread(data, bytes, count, file_);
-#elif PPSSPP_PLATFORM(SWITCH)
+#elif PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU)
 	// Toolchain has no fancy IO API.  We must lock.
 	std::lock_guard<std::mutex> guard(readLock_);
 	lseek(fd_, absolutePos, SEEK_SET);

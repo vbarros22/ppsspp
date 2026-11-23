@@ -374,6 +374,8 @@ add_library(Common STATIC
 	MemArenaPosix.cpp
 	MemArenaWin32.cpp
 	MemArenaHorizon.cpp
+	MemArenaWiiU.cpp
+	WiiU/Atomic64.c
 	MemArena.h
 	MemoryUtil.cpp
 	MemoryUtilHorizon.cpp
