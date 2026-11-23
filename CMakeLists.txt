@@ -109,8 +109,8 @@ if(WIIU)
 	set(USE_NO_MMAP ON CACHE BOOL "" FORCE)
 	# No dynamic loading.
 	set(CMAKE_DL_LIBS "")
-	# RPX executables only support the global-dynamic TLS model (thread_local).
-	add_compile_options(-ftls-model=global-dynamic)
+	# wut has no thread-local storage: use Common/Thread/ThreadLocal.h instead of thread_local.
+	add_compile_definitions(SOL_NO_THREAD_LOCAL=1)
 	# The Wii U network stack has no IPv6.
 	add_compile_definitions(ENET_IPV4_ONLY)
 endif()

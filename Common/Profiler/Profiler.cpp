@@ -7,6 +7,7 @@
 
 #include "ppsspp_config.h"
 
+#include "Common/Thread/ThreadLocal.h"
 #include "Common/Profiler/Profiler.h"
 
 #ifdef USE_PROFILER
@@ -112,7 +113,7 @@ struct LaneOwner {
 	}
 };
 
-thread_local LaneOwner t_laneOwner;
+PPSSPP_THREAD_LOCAL(LaneOwner, t_laneOwner);
 
 Lane *ClaimLane() {
 	std::lock_guard<std::mutex> guard(g_lanesMutex);
@@ -140,7 +141,7 @@ Lane *ClaimLane() {
 }
 
 inline Lane *CurrentLane() {
-	LaneOwner &owner = t_laneOwner;
+	LaneOwner &owner = PPSSPP_TLS_GET(t_laneOwner);
 	if (!owner.lane && !owner.failed) {
 		owner.lane = ClaimLane();
 		owner.failed = owner.lane == nullptr;

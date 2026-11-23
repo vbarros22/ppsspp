@@ -312,6 +312,7 @@ add_library(Common STATIC
 	Thread/Promise.h
 	Thread/ThreadUtil.cpp
 	Thread/ThreadUtil.h
+	Thread/ThreadLocal.h
 	Thread/ThreadManager.cpp
 	Thread/ThreadManager.h
 	Thread/Waitable.h

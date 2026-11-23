@@ -20,6 +20,7 @@
 #include <climits>
 #include <cmath>
 
+#include "Common/Thread/ThreadLocal.h"
 #include "Common/Common.h"
 #include "Common/CPUDetect.h"
 #include "Common/Data/Convert/ColorConv.h"
@@ -2718,7 +2719,8 @@ void DrawLine(const VertexData &v0, const VertexData &v1, const BinCoords &range
 
 	const int steps1 = steps == 0 ? 1 : steps;
 	const LineUV lineUV = state.enableTextures && !state.throughMode ? ComputeLineUV(v0, v1, state.textureProj) : LineUV{};
-	static thread_local std::vector<LinePixel> pixels;
+	PPSSPP_THREAD_LOCAL(std::vector<LinePixel>, linePixels);
+	std::vector<LinePixel> &pixels = PPSSPP_TLS_GET(linePixels);
 	LinePixels(a.x, a.y, b.x, b.y, pixels);
 	for (const LinePixel &lp : pixels) {
 		const int i = std::clamp((int)lroundf(lp.t * steps), 0, steps);

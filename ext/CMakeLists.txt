@@ -173,4 +173,8 @@ if(WIIU)
 	foreach(tgt aemu_postoffice_client aemu_postoffice_server)
 		target_compile_options(${tgt} PRIVATE -include ${CMAKE_SOURCE_DIR}/Common/Net/WiiUSocketCompat.h)
 	endforeach()
+	# No TLS on the Wii U (see Common/Thread/ThreadLocal.h). The relay server's one
+	# thread_local is a scratch buffer, which becomes a single shared one here: fine for
+	# one client at a time, but hosting the relay server on a Wii U isn't supported.
+	target_compile_definitions(aemu_postoffice_server PRIVATE thread_local=)
 endif()
