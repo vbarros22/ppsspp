@@ -450,7 +450,7 @@ void VertexDecoder::Step_TcU16MorphToFloat(const VertexDecoder *dec, const u8 *p
 
 	for (int n = 0; n < morphcount; n++) {
 		const float w = gstate_c.morphWeights[n];
-		const u16 *uvdata = (const u16 *)(b_uvdata);
+		const u16_le *uvdata = (const u16_le *)(b_uvdata);
 		uv[0] += (float)uvdata[0] * w;
 		uv[1] += (float)uvdata[1] * w;
 		b_uvdata += onesize;
@@ -573,7 +573,8 @@ void VertexDecoder::Step_ColorInvalid(const VertexDecoder *dec, const u8 *ptr, u
 
 void VertexDecoder::Step_Color565(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
 	u16 cdata = *(const u16_le *)(ptr + dec->coloff);
-	u32 *c = (u32 *)(decoded + dec->decFmt.c0off);
+	// Decoded colors are R, G, B, A bytes (as Step_Color8888 copies them), whatever the host.
+	u32_le *c = (u32_le *)(decoded + dec->decFmt.c0off);
 	*c = RGB565ToRGBA8888(cdata);
 }
 
@@ -583,7 +584,8 @@ void VertexDecoder::Step_Color5551(const VertexDecoder *dec, const u8 *ptr, u8 *
 	if (!alpha) {
 		gstate_c.vertexFullAlpha = false;
 	}
-	u32 *c = (u32 *)(decoded + dec->decFmt.c0off);
+	// Decoded colors are R, G, B, A bytes (as Step_Color8888 copies them), whatever the host.
+	u32_le *c = (u32_le *)(decoded + dec->decFmt.c0off);
 	*c = RGBA5551ToRGBA8888(cdata);
 }
 
@@ -592,7 +594,8 @@ void VertexDecoder::Step_Color4444(const VertexDecoder *dec, const u8 *ptr, u8 *
 	if ((cdata >> 12) != 0xF) {
 		gstate_c.vertexFullAlpha = false;
 	}
-	u32 *c = (u32 *)(decoded + dec->decFmt.c0off);
+	// Decoded colors are R, G, B, A bytes (as Step_Color8888 copies them), whatever the host.
+	u32_le *c = (u32_le *)(decoded + dec->decFmt.c0off);
 	*c = RGBA4444ToRGBA8888(cdata);
 }
 
@@ -874,7 +877,14 @@ void VertexDecoder::Step_PosS16(const VertexDecoder *dec, const u8 *ptr, u8 *dec
 }
 
 void VertexDecoder::Step_PosFloat(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
+#if COMMON_BIG_ENDIAN
+	// PSP memory is little-endian.
+	const float_le *fle = (const float_le *)(ptr + dec->posoff);
+	const float f4[4] = { fle[0], fle[1], fle[2], 0.0f };
+	Vec4F32 v = Vec4F32::Load(f4);
+#else
 	Vec4F32 v = Vec4F32::Load((const float *)(ptr + dec->posoff));
+#endif
 	// NaN and infinity only have to come out finite, so that the viewport scale can zero them later
 	// like the PSP does (0 * NaN == 0 there). The platforms differ in how (SSE clamps, NEON zeroes),
 	// and so do the JITs, which is fine.
@@ -930,8 +940,9 @@ void VertexDecoder::Step_PosS16Through(const VertexDecoder *dec, const u8 *ptr, 
 
 void VertexDecoder::Step_PosFloatThrough(const VertexDecoder *dec, const u8 *ptr, u8 *decoded) {
 	float *v = (float *)(decoded + dec->decFmt.posoff);
-	const float *fv = (const float *)(ptr + dec->posoff);
-	memcpy(v, fv, 8);
+	const float_le *fv = (const float_le *)(ptr + dec->posoff);
+	v[0] = fv[0];
+	v[1] = fv[1];
 	// Depth is an integer in through mode: truncate, and clamp to 16 bits (NaN becomes 0).
 	const float z = fv[2];
 	v[2] = z >= 65535.0f ? 65535.0f : (z > 0.0f ? (float)(int)z : 0.0f);

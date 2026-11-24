@@ -750,6 +750,10 @@ void CopyAndSumMask16(u16 *dst, const u16 *src, int width, u32 *outMask) {
 		mask &= color;
 		dst[i] = color;
 	}
+	// The data is little-endian (PSP memory); give the mask in value order.
+#if COMMON_BIG_ENDIAN
+	mask = bswap16(mask);
+#endif
 	*outMask &= (u32)mask;
 }
 
@@ -790,6 +794,10 @@ void CopyAndSumMask32(u32 *dst, const u32 *src, int width, u32 *outMask) {
 		mask &= color;
 		dst[i] = color;
 	}
+	// The data is little-endian (PSP memory); give the mask in value order.
+#if COMMON_BIG_ENDIAN
+	mask = bswap32(mask);
+#endif
 	*outMask &= (u32)mask;
 }
 
@@ -821,6 +829,10 @@ void CheckMask16(const u16 *src, int width, u32 *outMask) {
 	for (int i = 0; i < width; i++) {
 		mask &= src[i];
 	}
+	// The data is little-endian (PSP memory); give the mask in value order.
+#if COMMON_BIG_ENDIAN
+	mask = bswap16(mask);
+#endif
 	*outMask &= (u32)mask;
 }
 
@@ -852,5 +864,9 @@ void CheckMask32(const u32 *src, int width, u32 *outMask) {
 	for (int i = 0; i < width; i++) {
 		mask &= src[i];
 	}
+	// The data is little-endian (PSP memory); give the mask in value order.
+#if COMMON_BIG_ENDIAN
+	mask = bswap32(mask);
+#endif
 	*outMask &= (u32)mask;
 }
