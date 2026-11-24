@@ -841,6 +841,18 @@ void PPGeDrawCurrentText(u32 color) {
 
 	if (dlPtr) {
 		float scale = char_lines_metrics.scale;
+#if PPSSPP_PLATFORM(WIIU)
+		{
+			static int logged = 0;
+			if (logged < 20) {
+				logged++;
+				size_t chars = 0;
+				for (const auto &line : char_lines)
+					chars += line.size();
+				INFO_LOG(Log::sceGe, "WiiU PPGe text: %d chars in %d lines at dl %08x, atlas %dx%d, window %d", (int)chars, (int)char_lines.size(), dlWritePtr, atlasWidth, atlasHeight, (int)useTextureWindow);
+			}
+		}
+#endif
 
 		if (useTextureWindow) {
 			WriteCmd(GE_CMD_TEXWRAP, 0);

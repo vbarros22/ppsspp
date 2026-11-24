@@ -1002,6 +1002,16 @@ bool SoftGPU::CopyBlockTransfer(u32 srcBasePtr, u32 srcStride, int srcX, int src
 void SoftGPU::Execute_Prim(u32 op, u32 diff) {
 #if PPSSPP_PLATFORM(WIIU)
 	g_wiiuPrimsSinceReport++;
+	{
+		// Bring-up: what PPGe's own display list (at 08000400) draws.
+		static int ppgeLogged = 0;
+		if (currentList && currentList->pc >= 0x08000400 && currentList->pc < 0x08010400 && ppgeLogged < 60) {
+			ppgeLogged++;
+			INFO_LOG(Log::G3D, "WiiU PPGe prim: pc %08x prim %d count %d texEnable %08x vtype %06x texaddr %08x texsize %06x texfmt %d clear %d",
+				currentList->pc, (int)((op >> 16) & 7), (int)(op & 0xFFFF), gstate.textureMapEnable, gstate.vertType & 0xFFFFFF,
+				gstate.getTextureAddress(0), gstate.texsize[0] & 0xFFFFFF, (int)gstate.getTextureFormat(), (int)gstate.isModeClear());
+		}
+	}
 #endif
 	u32 count = op & 0xFFFF;
 	// Upper bits are ignored.
