@@ -76,7 +76,7 @@ static inline void SetPixelDepth(int x, int y, int stride, u16 value) {
 // The depths of a span's four pixels from x.
 // Loaded as a vector where they're stored together (all but across a 16-pixel run).
 static inline Vec4S32 ReadSpanDepth(int x, int y, int stride) {
-	if (depthbuf.Contiguous4(x, y, stride))
+	if (!kSoftBigEndian && depthbuf.Contiguous4(x, y, stride))
 		return Vec4S32::LoadU16(depthbuf.Get16Ptr(x, y, stride));
 	alignas(16) int out[4];
 	for (int i = 0; i < 4; ++i)
@@ -958,10 +958,14 @@ static inline void DrawSpanVector(int x, int y, const int *maskIn, const int *zI
 	alignas(16) int old[4];
 	if (fbFormat == GE_FORMAT_8888) {
 		memcpy(old, fb.Get32Ptr(x, y, fbStride), sizeof(old));
+		if (kSoftBigEndian) {
+			for (int i = 0; i < 4; ++i)
+				old[i] = (int)SoftLE((u32)old[i]);
+		}
 	} else {
 		const u16 *p = fb.Get16Ptr(x, y, fbStride);
 		for (int i = 0; i < 4; ++i)
-			old[i] = p[i];
+			old[i] = SoftLE(p[i]);
 	}
 	const Vec4S32 oldRaw = Vec4S32::Load(old);
 	// The old channels; the alpha is also the stencil (GetPixelStencil).
@@ -1002,7 +1006,7 @@ static inline void DrawSpanVector(int x, int y, const int *maskIn, const int *zI
 			u16 *zp = depthbuf.Get16Ptr(x, y, depthStride);
 			for (int i = 0; i < 4; ++i) {
 				if (!colorDeadLanes[i])
-					zp[i] = (u16)zIn[i];
+					zp[i] = SoftLE((u16)zIn[i]);
 			}
 		} else {
 			for (int i = 0; i < 4; ++i) {
@@ -1106,19 +1110,19 @@ static inline void DrawSpanVector(int x, int y, const int *maskIn, const int *zI
 	const bool allLive = (deadLanes[0] | deadLanes[1] | deadLanes[2] | deadLanes[3]) == 0;
 	if (fbFormat == GE_FORMAT_8888) {
 		u32 *p = fb.Get32Ptr(x, y, fbStride);
-		if (allLive) {
+		if (allLive && !kSoftBigEndian) {
 			memcpy(p, out, sizeof(out));
 		} else {
 			for (int i = 0; i < 4; ++i) {
 				if (!deadLanes[i])
-					p[i] = (u32)out[i];
+					p[i] = SoftLE((u32)out[i]);
 			}
 		}
 	} else {
 		u16 *p = fb.Get16Ptr(x, y, fbStride);
 		for (int i = 0; i < 4; ++i) {
 			if (!deadLanes[i])
-				p[i] = (u16)out[i];
+				p[i] = SoftLE((u16)out[i]);
 		}
 	}
 }

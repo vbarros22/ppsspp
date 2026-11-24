@@ -22,6 +22,19 @@
 #include "GPU/GPUCommon.h"
 #include "GPU/Common/DepthSwizzle.h"
 #include "Common/GPU/thin3d.h"
+#include "Common/Swap.h"
+
+// VRAM, like all PSP memory, holds little-endian values. Every pixel and depth the rasterizer reads or
+// writes goes through this, which swaps on big-endian hosts (it's its own inverse.)
+#if COMMON_BIG_ENDIAN
+constexpr bool kSoftBigEndian = true;
+inline u16 SoftLE(u16 v) { return bswap16(v); }
+inline u32 SoftLE(u32 v) { return bswap32(v); }
+#else
+constexpr bool kSoftBigEndian = false;
+inline u16 SoftLE(u16 v) { return v; }
+inline u32 SoftLE(u32 v) { return v; }
+#endif
 
 struct FormatBuffer {
 	FormatBuffer() { data = nullptr; }
@@ -32,19 +45,19 @@ struct FormatBuffer {
 	};
 
 	inline void Set16(int x, int y, int stride, u16 v) const {
-		as16[x + y * stride] = v;
+		as16[x + y * stride] = SoftLE(v);
 	}
 
 	inline void Set32(int x, int y, int stride, u32 v) const {
-		as32[x + y * stride] = v;
+		as32[x + y * stride] = SoftLE(v);
 	}
 
 	inline u16 Get16(int x, int y, int stride) const {
-		return as16[x + y * stride];
+		return SoftLE(as16[x + y * stride]);
 	}
 
 	inline u32 Get32(int x, int y, int stride) const {
-		return as32[x + y * stride];
+		return SoftLE(as32[x + y * stride]);
 	}
 
 	inline u16 *Get16Ptr(int x, int y, int stride) const {
@@ -69,10 +82,10 @@ struct DepthBuffer {
 		return (u16 *)(vram + layout.Stored(base + (uint32_t)(x + y * stride) * 2));
 	}
 	inline u16 Get16(int x, int y, int stride) const {
-		return *Get16Ptr(x, y, stride);
+		return SoftLE(*Get16Ptr(x, y, stride));
 	}
 	inline void Set16(int x, int y, int stride, u16 v) const {
-		*Get16Ptr(x, y, stride) = v;
+		*Get16Ptr(x, y, stride) = SoftLE(v);
 	}
 	// Whether the four depths from x in row y are stored together: unless they cross the end of a 16-pixel run.
 	inline bool Contiguous4(int x, int y, int stride) const {

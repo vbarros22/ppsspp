@@ -778,7 +778,7 @@ static inline void ApplyTexturing(const RasterizerState &state, int *colors, int
 // Depth at x to x + 3 in row y. They're stored together unless they cross the end of a 16-pixel run.
 static inline u64 ReadDepth4(int x, int y, int stride) {
 	const uint32_t offset = depthbuf.base + (uint32_t)(x + y * stride) * 2;
-	if ((offset & 31) <= 24) {
+	if (!kSoftBigEndian && (offset & 31) <= 24) {
 		u64 v;
 		memcpy(&v, depthbuf.Get16Ptr(x, y, stride), sizeof(v));
 		return v;
@@ -1694,7 +1694,9 @@ void DrawTriangleSlice(
 							dead = dead | z.CompareLt(minzV) | z.CompareGt(maxzV);
 						// -1 where z func ref fails.
 						const u64 depth4 = ReadDepth4((chunkX + k) & 0x3FF, p.y, pixelID.cached.depthbufStride);
-						const Vec4S32 ref = Vec4S32::LoadU16((const u16 *)&depth4);
+						// Lane i is bits 16i of the value, not the ith u16 in memory on big-endian hosts.
+						alignas(16) const int refs[4] = { (int)(depth4 & 0xFFFF), (int)((depth4 >> 16) & 0xFFFF), (int)((depth4 >> 32) & 0xFFFF), (int)(depth4 >> 48) };
+						const Vec4S32 ref = kSoftBigEndian ? Vec4S32::LoadAligned(refs) : Vec4S32::LoadU16((const u16 *)&depth4);
 						switch (func) {
 						case GE_COMP_NEVER: dead = allOnes; break;
 						case GE_COMP_ALWAYS: break;

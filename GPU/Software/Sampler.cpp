@@ -24,6 +24,7 @@
 #include "Common/Math/SIMDHeaders.h"
 #include "GPU/Common/TextureDecoder.h"
 #include "GPU/Software/BinManager.h"
+#include "GPU/Software/SoftGpu.h"
 #include "GPU/Software/Rasterizer.h"
 #include "GPU/Software/RasterizerTypes.h"
 #include "GPU/Software/Sampler.h"
@@ -78,16 +79,16 @@ static inline u32 LookupColor(unsigned int index, unsigned int level, const Samp
 
 	switch (samplerID.ClutFmt()) {
 	case GE_CMODE_16BIT_BGR5650:
-		return RGB565ToRGBA8888(samplerID.cached.clut16[index + clutSharingOffset]);
+		return RGB565ToRGBA8888(SoftLE(samplerID.cached.clut16[index + clutSharingOffset]));
 
 	case GE_CMODE_16BIT_ABGR5551:
-		return RGBA5551ToRGBA8888(samplerID.cached.clut16[index + clutSharingOffset]);
+		return RGBA5551ToRGBA8888(SoftLE(samplerID.cached.clut16[index + clutSharingOffset]));
 
 	case GE_CMODE_16BIT_ABGR4444:
-		return RGBA4444ToRGBA8888(samplerID.cached.clut16[index + clutSharingOffset]);
+		return RGBA4444ToRGBA8888(SoftLE(samplerID.cached.clut16[index + clutSharingOffset]));
 
 	case GE_CMODE_32BIT_ABGR8888:
-		return samplerID.cached.clut32[index + clutSharingOffset];
+		return SoftLE(samplerID.cached.clut32[index + clutSharingOffset]);
 
 	default:
 		ERROR_LOG(Log::G3D, "Software: Unsupported palette format: %x", samplerID.ClutFmt());
@@ -130,28 +131,28 @@ inline static Nearest4 SOFTRAST_CALL SampleNearest(const int u[N], const int v[N
 	case GE_TFMT_4444:
 		for (int i = 0; i < N; ++i) {
 			const u8 *src = srcptr + GetPixelDataOffset<16>(texbufw, u[i], v[i], samplerID.swizzle);
-			res.v[i] = RGBA4444ToRGBA8888(*(const u16 *)src);
+			res.v[i] = RGBA4444ToRGBA8888(SoftLE(*(const u16 *)src));
 		}
 		return res;
 	
 	case GE_TFMT_5551:
 		for (int i = 0; i < N; ++i) {
 			const u8 *src = srcptr + GetPixelDataOffset<16>(texbufw, u[i], v[i], samplerID.swizzle);
-			res.v[i] = RGBA5551ToRGBA8888(*(const u16 *)src);
+			res.v[i] = RGBA5551ToRGBA8888(SoftLE(*(const u16 *)src));
 		}
 		return res;
 
 	case GE_TFMT_5650:
 		for (int i = 0; i < N; ++i) {
 			const u8 *src = srcptr + GetPixelDataOffset<16>(texbufw, u[i], v[i], samplerID.swizzle);
-			res.v[i] = RGB565ToRGBA8888(*(const u16 *)src);
+			res.v[i] = RGB565ToRGBA8888(SoftLE(*(const u16 *)src));
 		}
 		return res;
 
 	case GE_TFMT_8888:
 		for (int i = 0; i < N; ++i) {
 			const u8 *src = srcptr + GetPixelDataOffset<32>(texbufw, u[i], v[i], samplerID.swizzle);
-			res.v[i] = *(const u32 *)src;
+			res.v[i] = SoftLE(*(const u32 *)src);
 		}
 		return res;
 
@@ -570,10 +571,10 @@ static inline uint64_t LerpSpread(uint64_t a, uint64_t b, int f) {
 template <GEPaletteFormat clutFmt>
 static inline uint32_t LookupClutT(uint32_t index, const SamplerID &samplerID) {
 	switch (clutFmt) {
-	case GE_CMODE_16BIT_BGR5650: return RGB565ToRGBA8888(samplerID.cached.clut16[index]);
-	case GE_CMODE_16BIT_ABGR5551: return RGBA5551ToRGBA8888(samplerID.cached.clut16[index]);
-	case GE_CMODE_16BIT_ABGR4444: return RGBA4444ToRGBA8888(samplerID.cached.clut16[index]);
-	default: return samplerID.cached.clut32[index];
+	case GE_CMODE_16BIT_BGR5650: return RGB565ToRGBA8888(SoftLE(samplerID.cached.clut16[index]));
+	case GE_CMODE_16BIT_ABGR5551: return RGBA5551ToRGBA8888(SoftLE(samplerID.cached.clut16[index]));
+	case GE_CMODE_16BIT_ABGR4444: return RGBA4444ToRGBA8888(SoftLE(samplerID.cached.clut16[index]));
+	default: return SoftLE(samplerID.cached.clut32[index]);
 	}
 }
 
@@ -607,10 +608,10 @@ static inline uint32_t ColumnOffsetT(int u) {
 template <GETextureFormat fmt, GEPaletteFormat clutFmt>
 static inline uint32_t ReadTexelT(const u8 *p, int u, uint32_t clutOffset, const SamplerID &samplerID) {
 	switch (fmt) {
-	case GE_TFMT_4444: return RGBA4444ToRGBA8888(*(const u16 *)p);
-	case GE_TFMT_5551: return RGBA5551ToRGBA8888(*(const u16 *)p);
-	case GE_TFMT_5650: return RGB565ToRGBA8888(*(const u16 *)p);
-	case GE_TFMT_8888: return *(const u32 *)p;
+	case GE_TFMT_4444: return RGBA4444ToRGBA8888(SoftLE(*(const u16 *)p));
+	case GE_TFMT_5551: return RGBA5551ToRGBA8888(SoftLE(*(const u16 *)p));
+	case GE_TFMT_5650: return RGB565ToRGBA8888(SoftLE(*(const u16 *)p));
+	case GE_TFMT_8888: return SoftLE(*(const u32 *)p);
 	case GE_TFMT_CLUT32: return LookupClutT<clutFmt>(TransformClutIndex(p[0] + (p[1] << 8) + (p[2] << 16) + (p[3] << 24), samplerID) + clutOffset, samplerID);
 	case GE_TFMT_CLUT16: return LookupClutT<clutFmt>(TransformClutIndex(p[0] + (p[1] << 8), samplerID) + clutOffset, samplerID);
 	case GE_TFMT_CLUT8: return LookupClutT<clutFmt>(TransformClutIndex(*p, samplerID) + clutOffset, samplerID);
@@ -744,7 +745,8 @@ static inline void ReadTexels4T(Vec4F32 s, Vec4F32 t, const u8 *tptr, int bufw, 
 	constexpr uint32_t bits = TexelBitsT<fmt>();
 	// The common formats in lanes: the texels (and their CLUT entries) gathered, and the CLUT index in between.
 	constexpr bool clutLanes = (fmt == GE_TFMT_CLUT4 || fmt == GE_TFMT_CLUT8) && clutFmt == GE_CMODE_32BIT_ABGR8888;
-	if constexpr (clutLanes || fmt == GE_TFMT_8888) {
+	// The gathers read texels and palette entries as host words, so not on big-endian hosts.
+	if constexpr ((clutLanes || fmt == GE_TFMT_8888) && !kSoftBigEndian) {
 		if (fmt == GE_TFMT_8888 || !samplerID.hasClutShift) {
 			const Vec4S32 row0 = RowOffsets4<bits, swizzled>(bufw, v0), row1 = RowOffsets4<bits, swizzled>(bufw, v1);
 			const Vec4S32 col0 = ColumnOffsets4<bits, swizzled>(u0), col1 = ColumnOffsets4<bits, swizzled>(u1);

@@ -90,13 +90,13 @@ static inline void DrawSinglePixel(u16 *pixel, const u32 color_in) {
 		u32 old_color;
 		switch (fmt) {
 		case GE_FORMAT_565:
-			old_color = RGB565ToRGBA8888(*pixel);
+			old_color = RGB565ToRGBA8888(SoftLE(*pixel));
 			break;
 		case GE_FORMAT_5551:
-			old_color = RGBA5551ToRGBA8888(*pixel);
+			old_color = RGBA5551ToRGBA8888(SoftLE(*pixel));
 			break;
 		case GE_FORMAT_4444:
-			old_color = RGBA4444ToRGBA8888(*pixel);
+			old_color = RGBA4444ToRGBA8888(SoftLE(*pixel));
 			break;
 		default:
 			old_color = 0;  // avoid warning. can't get here though since we enumerate all 16-bit formats above.
@@ -108,13 +108,13 @@ static inline void DrawSinglePixel(u16 *pixel, const u32 color_in) {
 
 	switch (fmt) {
 	case GE_FORMAT_565:
-		*pixel = RGBA8888ToRGB565(new_color);
+		*pixel = SoftLE((u16)RGBA8888ToRGB565(new_color));
 		break;
 	case GE_FORMAT_5551:
-		*pixel = RGBA8888ToRGBA555X(new_color) | (*pixel & 0x8000);
+		*pixel = SoftLE((u16)(RGBA8888ToRGBA555X(new_color) | (SoftLE(*pixel) & 0x8000)));
 		break;
 	case GE_FORMAT_4444:
-		*pixel = RGBA8888ToRGBA444X(new_color) | (*pixel & 0xF000);
+		*pixel = SoftLE((u16)(RGBA8888ToRGBA444X(new_color) | (SoftLE(*pixel) & 0xF000)));
 		break;
 	default:
 		break;
@@ -128,11 +128,11 @@ static inline void DrawSinglePixel32(u32 *pixel, const u32 color_in) {
 	if (!alphaBlend || (color_in >> 24) == 255) {
 		new_color = color_in & 0xFFFFFF;
 	} else {
-		const u32 old_color = *pixel;
+		const u32 old_color = SoftLE(*pixel);
 		new_color = StandardAlphaBlend(color_in, old_color);
 	}
-	new_color |= *pixel & 0xFF000000;
-	*pixel = new_color;
+	new_color |= SoftLE(*pixel) & 0xFF000000;
+	*pixel = SoftLE(new_color);
 }
 
 // Check if we can safely ignore the alpha test, assuming standard alpha blending.
