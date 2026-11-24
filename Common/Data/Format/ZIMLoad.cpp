@@ -6,6 +6,7 @@
 
 #include "zlib.h"
 
+#include "Common/Swap.h"
 #include "Common/Log.h"
 #include "Common/Data/Format/ZIMLoad.h"
 #include "Common/Math/math_util.h"
@@ -59,9 +60,12 @@ int LoadZIMPtr(const uint8_t *zim, size_t datasize, int *width, int *height, int
 		ERROR_LOG(Log::IO, "Not a ZIM file");
 		return 0;
 	}
-	memcpy(width, zim + 4, 4);
-	memcpy(height, zim + 8, 4);
-	memcpy(flags, zim + 12, 4);
+	// Little-endian in the file.
+	u32_le header[3];
+	memcpy(header, zim + 4, sizeof(header));
+	*width = (int)(u32)header[0];
+	*height = (int)(u32)header[1];
+	*flags = (int)(u32)header[2];
 
 	// Nothing we use is anywhere near this, and the data is often compressed, so the
 	// size is otherwise only bounded by how much memory a decompression bomb can claim.

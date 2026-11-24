@@ -56,7 +56,7 @@ class ElfReader {
 public:
 	ElfReader(const void *ptr, size_t size) {
 		base = (const char*)ptr;
-		base32 = (const u32 *)ptr;
+		base32 = (const u32_le *)ptr;
 		size_ = size;
 		// Don't read the header to find the segment and section tables before we know it's there.
 		// LoadInto() rejects anything this small; header stays null so nothing else can use it either.
@@ -187,7 +187,7 @@ public:
 
 private:
 	const char *base = nullptr;
-	const u32 *base32 = nullptr;
+	const u32_le *base32 = nullptr;
 	const Elf32_Ehdr *header = nullptr;
 	const Elf32_Phdr *segments = nullptr;
 	const Elf32_Shdr *sections = nullptr;

@@ -4,8 +4,10 @@
 // nearly plain GLSL 4.50, so it is lightly preprocessed (no descriptor sets, gl_VertexIndex)
 // and compiled on the console by CafeGLSL. Bindings and locations carry over unchanged.
 //
-// Conventions match Direct3D 11: clip space Y up (the vertex shaders flip, viewportYSign "-"),
-// depth 0..1 (GX2's "half Z"), textures and render targets with the origin at the top left.
+// Conventions: thin3d works like Vulkan (clip space Y pointing down, depth 0..1, origin at the
+// top left). GX2's clip space has Y pointing up, so the viewport is set upside down (negative
+// height), which flips everything without touching the shaders (measured on hardware: without
+// it the menu came out upside down). That also swaps which winding is front-facing.
 //
 // Rules learned on hardware (see WiiU/test/gx2_test.cpp):
 // - Shader programs and fetch shaders written by the CPU must be flushed with GX2Invalidate
@@ -154,6 +156,11 @@ static GX2LogicOp ToGX2(LogicOp op) {
 }
 
 // Texture formats. compMap reorders channels as the shader sees them.
+//
+// Byte order: thin3d's formats are defined by the order of the bytes in memory (R8G8B8A8 is
+// R, G, B, A), and GX2's 8888 formats read texels the same way, byte by byte. (An earlier build
+// reversed them; on hardware that turned the gold icon pink and every opaque image red, which is
+// exactly R<->A, G<->B.)
 static bool TextureFormatToGX2(DataFormat fmt, TextureSwizzle swizzle, GX2SurfaceFormat *out, uint32_t *compMap) {
 	*compMap = GX2_COMP_MAP(GX2_SQ_SEL_R, GX2_SQ_SEL_G, GX2_SQ_SEL_B, GX2_SQ_SEL_A);
 	switch (fmt) {
@@ -161,6 +168,7 @@ static bool TextureFormatToGX2(DataFormat fmt, TextureSwizzle swizzle, GX2Surfac
 		*out = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
 		return true;
 	case DataFormat::B8G8R8A8_UNORM:
+		// Memory B, G, R, A: swap red and blue.
 		*out = GX2_SURFACE_FORMAT_UNORM_R8_G8_B8_A8;
 		*compMap = GX2_COMP_MAP(GX2_SQ_SEL_B, GX2_SQ_SEL_G, GX2_SQ_SEL_R, GX2_SQ_SEL_A);
 		return true;
@@ -649,6 +657,7 @@ private:
 	void ApplyPipelineState();
 	void ApplyDrawState();
 	void ApplyStencil();
+	void ApplyViewport();
 	void SetTarget(GX2FramebufferObject *fb);
 
 	DeviceCaps caps_{};
@@ -702,9 +711,12 @@ GX2DrawContext::GX2DrawContext(GX2ColorBuffer *backColor, GX2DepthBuffer *backDe
 	caps_.provokingVertexLast = false;
 	caps_.verySlowShaderCompiler = true;  // Compiling on an Espresso, with Mesa.
 
+	InitGLSLCompiler();
+	INFO_LOG(Log::G3D, "CafeGLSL %s", GetGLSLCompilerVersion());
+
+	// Clip space comes out like Vulkan's (no Y flip needed): measured on hardware, the menu
+	// was upside down with a flip.
 	shaderLanguageDesc_.Init(GLSL_VULKAN);
-	// Our clip space is Y up like Direct3D's, so the vertex shaders flip Y.
-	shaderLanguageDesc_.viewportYSign = "-";
 
 	context_ = (GX2ContextState *)AllocGPU(sizeof(GX2ContextState), GX2_CONTEXT_STATE_ALIGNMENT);
 	GX2SetupContextStateEx(context_, TRUE);
@@ -725,6 +737,7 @@ GX2DrawContext::~GX2DrawContext() {
 	DestroyPresets();
 	// The caller (frontend) makes sure the GPU is idle before tearing down.
 	FreeGPU(context_);
+	DestroyGLSLCompiler();
 }
 
 uint32_t GX2DrawContext::GetDataFormatSupport(DataFormat fmt) const {
@@ -837,9 +850,12 @@ Pipeline *GX2DrawContext::CreateGraphicsPipeline(const PipelineDesc &desc, const
 Texture *GX2DrawContext::CreateTexture(const TextureDesc &desc) {
 	GX2TextureObject *tex = new GX2TextureObject();
 	if (!tex->Create(desc)) {
+		ERROR_LOG(Log::G3D, "GX2: CreateTexture '%s' %dx%d %s (%d levels) FAILED", desc.tag ? desc.tag : "", desc.width, desc.height, DataFormatToString(desc.format), desc.mipLevels);
 		tex->Release();
 		return nullptr;
 	}
+	INFO_LOG(Log::G3D, "GX2: CreateTexture '%s' %dx%d %s (%d levels, %d init), pitch %u, %u bytes", desc.tag ? desc.tag : "", desc.width, desc.height,
+		DataFormatToString(desc.format), desc.mipLevels, (int)desc.initData.size(), tex->tex.surface.pitch, tex->tex.surface.imageSize);
 	return tex;
 }
 
@@ -903,7 +919,7 @@ void GX2DrawContext::SetTarget(GX2FramebufferObject *fb) {
 		GX2SetDepthBuffer(depth);
 	int w = CurColor()->surface.width, h = CurColor()->surface.height;
 	viewport_ = Viewport{ 0.0f, 0.0f, (float)w, (float)h, 0.0f, 1.0f };
-	GX2SetViewport(0.0f, 0.0f, (float)w, (float)h, 0.0f, 1.0f);
+	ApplyViewport();
 	scissor_[0] = 0; scissor_[1] = 0; scissor_[2] = w; scissor_[3] = h;
 	GX2SetScissor(0, 0, w, h);
 }
@@ -960,7 +976,13 @@ void GX2DrawContext::SetScissorRect(int left, int top, int width, int height) {
 
 void GX2DrawContext::SetViewport(const Viewport &vp) {
 	viewport_ = vp;
-	GX2SetViewport(vp.TopLeftX, vp.TopLeftY, vp.Width, vp.Height, vp.MinDepth, vp.MaxDepth);
+	ApplyViewport();
+}
+
+void GX2DrawContext::ApplyViewport() {
+	// Upside down, see the top of the file.
+	const Viewport &vp = viewport_;
+	GX2SetViewport(vp.TopLeftX, vp.TopLeftY + vp.Height, vp.Width, -vp.Height, vp.MinDepth, vp.MaxDepth);
 }
 
 void GX2DrawContext::SetBlendFactor(float color[4]) {
@@ -1069,7 +1091,8 @@ void GX2DrawContext::ApplyPipelineState() {
 		const RasterStateDesc &r = p->raster->desc;
 		bool cullFront = r.cull == CullMode::FRONT || r.cull == CullMode::FRONT_AND_BACK;
 		bool cullBack = r.cull == CullMode::BACK || r.cull == CullMode::FRONT_AND_BACK;
-		GX2SetCullOnlyControl(r.frontFace == Facing::CW ? GX2_FRONT_FACE_CW : GX2_FRONT_FACE_CCW, cullFront, cullBack);
+		// The flipped viewport mirrors the winding.
+		GX2SetCullOnlyControl(r.frontFace == Facing::CW ? GX2_FRONT_FACE_CCW : GX2_FRONT_FACE_CW, cullFront, cullBack);
 	}
 	pipelineDirty_ = false;
 }
@@ -1199,7 +1222,7 @@ void GX2DrawContext::RestoreState() {
 	GX2SetColorBuffer(CurColor(), GX2_RENDER_TARGET_0);
 	if (CurDepth())
 		GX2SetDepthBuffer(CurDepth());
-	GX2SetViewport(viewport_.TopLeftX, viewport_.TopLeftY, viewport_.Width, viewport_.Height, viewport_.MinDepth, viewport_.MaxDepth);
+	ApplyViewport();
 	GX2SetScissor(scissor_[0], scissor_[1], scissor_[2], scissor_[3]);
 	pipelineDirty_ = true;
 }

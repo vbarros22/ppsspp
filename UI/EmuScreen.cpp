@@ -337,6 +337,10 @@ void EmuScreen::ProcessGameBoot(const Path &filename) {
 		coreParam.gpuCore = GPUCORE_METAL;
 		break;
 	}
+#if PPSSPP_PLATFORM(WIIU)
+	// No hardware GPU backend for GX2 yet: the software renderer draws, thin3d presents.
+	coreParam.gpuCore = GPUCORE_SOFTWARE;
+#endif
 
 	// Preserve the existing graphics context.
 	coreParam.graphicsContext = PSP_CoreParameter().graphicsContext;

@@ -16,6 +16,7 @@
 // https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
 
 #include "ppsspp_config.h"
+#include "Common/Swap.h"
 #include "Common/Data/Convert/ColorConv.h"
 #include "Common/Data/Convert/SmallDataConvert.h"
 #include "Common/Common.h"
@@ -754,7 +755,23 @@ void ConvertRGBA8888ToPremulAlpha(u32 *dst, const u32 *src, u32 numPixels) {
 #endif // NEON
 
 	// Scalar fallback for remaining pixels (or if above SIMD not present)
+#if COMMON_LITTLE_ENDIAN
 	for (; i < numPixels; ++i) {
 		dst[i] = premul_pixel_scalar(src[i]);
 	}
+#else
+	// The pixels are R, G, B, A bytes in memory, which a native u32 doesn't see as 0xAABBGGRR
+	// on big-endian hosts, so go byte by byte (Blinn's rounding as above).
+	const uint8_t *s = (const uint8_t *)(src + i);
+	uint8_t *d = (uint8_t *)(dst + i);
+	for (; i < numPixels; ++i, s += 4, d += 4) {
+		const uint32_t a = s[3];
+		for (int c = 0; c < 3; c++) {
+			uint32_t x = s[c] * a + 128;
+			x += x >> 8;
+			d[c] = (uint8_t)(x >> 8);
+		}
+		d[3] = (uint8_t)a;
+	}
+#endif
 }

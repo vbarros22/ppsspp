@@ -23,8 +23,10 @@ RIFFReader::~RIFFReader() {
 int RIFFReader::ReadInt() {
 	int value = 0;
 	if (data_ && pos_ < eof_ - 3) {
+		// RIFF is little-endian; assemble the bytes so big-endian hosts read it right too.
+		const uint8_t *p = data_ + pos_;
+		value = (int)((uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
 		pos_ += 4;
-		memcpy(&value, data_ + pos_ - 4, 4);
 	}
 	return value;
 }

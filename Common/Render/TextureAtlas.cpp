@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <zstd.h>
 
+#include "Common/Swap.h"
 #include "Common/Log.h"
 #include "Common/Render/TextureAtlas.h"
 
@@ -34,8 +35,9 @@ public:
 			offset_ += sizeof(T) * count;
 		} else {
 			_dbg_assert_(offset_ + sizeof(uint32_t) <= size_);
-			uint32_t compressed_size = 0;
-			memcpy(&compressed_size, data_ + offset_, sizeof(uint32_t));
+			u32_le compressed_size_le = 0;  // Little-endian in the file.
+			memcpy(&compressed_size_le, data_ + offset_, sizeof(uint32_t));
+			const uint32_t compressed_size = compressed_size_le;
 			offset_ += sizeof(uint32_t);
 
 			_dbg_assert_(offset_ + compressed_size <= size_);
@@ -60,10 +62,21 @@ void Atlas::Clear() {
 	fonts = nullptr;
 }
 
+// The .meta files are little-endian: on big-endian hosts, swap the numbers after reading.
+// Every struct here starts with 32-bit fields (ints and floats).
+static void SwapWords(void *p, size_t count) {
+#if COMMON_BIG_ENDIAN
+	uint32_t *w = (uint32_t *)p;
+	for (size_t i = 0; i < count; i++)
+		w[i] = bswap32(w[i]);
+#endif
+}
+
 bool Atlas::LoadMeta(const uint8_t *data, size_t data_size) {
 	ByteReader reader(data, data_size);
 
 	AtlasHeader header = reader.Read<AtlasHeader>();
+	SwapWords(&header, 4);
 	if (header.magic != ATLAS_MAGIC) {
 		return false;
 	}
@@ -74,9 +87,12 @@ bool Atlas::LoadMeta(const uint8_t *data, size_t data_size) {
 	num_fonts = header.numFonts;
 
 	images = reader.ReadMultipleAlloc<AtlasImage>(num_images, header.version >= 1);
+	for (int i = 0; i < num_images; i++)
+		SwapWords((void *)&images[i], 6);  // u1, v1, u2, v2, w, h.
 	fonts = new AtlasFont[num_fonts];
 	for (int i = 0; i < num_fonts; i++) {
 		AtlasFontHeader font_header = reader.Read<AtlasFontHeader>();
+		SwapWords(&font_header, 6);  // padding, height, ascend, distslope, numRanges, numChars.
 		fonts[i].padding = font_header.padding;
 		fonts[i].height = font_header.height;
 		fonts[i].ascend = font_header.ascend;
@@ -85,6 +101,16 @@ bool Atlas::LoadMeta(const uint8_t *data, size_t data_size) {
 		fonts[i].numChars = font_header.numChars;
 		fonts[i].ranges = reader.ReadMultipleAlloc<AtlasCharRange>(font_header.numRanges, header.version >= 1);
 		fonts[i].charData = reader.ReadMultipleAlloc<AtlasChar>(font_header.numChars, header.version >= 1);
+#if COMMON_BIG_ENDIAN
+		for (int j = 0; j < font_header.numRanges; j++)
+			SwapWords((void *)&fonts[i].ranges[j], 3);
+		for (int j = 0; j < font_header.numChars; j++) {
+			AtlasChar *c = (AtlasChar *)&fonts[i].charData[j];
+			SwapWords(c, 7);  // sx, sy, ex, ey, ox, oy, wx.
+			c->pw = bswap16(c->pw);
+			c->ph = bswap16(c->ph);
+		}
+#endif
 		memcpy(fonts[i].name, font_header.name, sizeof(font_header.name));
 	}
 	return true;

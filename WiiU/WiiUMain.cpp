@@ -99,17 +99,21 @@ struct ButtonMap {
 	InputKeyCode key;
 };
 
+// PPSSPP's default mapping here is the generic gamepad one (Core/KeyMapDefaults.cpp,
+// defaultPadMap): BUTTON_2 = Cross, 3 = Circle, 4 = Square, 1 = Triangle, 7/8 = L/R,
+// 10 = Start, 9 = Select. The face buttons go by position, like on a PSP: B (bottom) is
+// Cross, A (right) Circle, Y (left) Square, X (top) Triangle.
 static const ButtonMap kButtons[] = {
-	{ VPAD_BUTTON_A, NKCODE_BUTTON_A },
-	{ VPAD_BUTTON_B, NKCODE_BUTTON_B },
-	{ VPAD_BUTTON_X, NKCODE_BUTTON_X },
-	{ VPAD_BUTTON_Y, NKCODE_BUTTON_Y },
-	{ VPAD_BUTTON_L, NKCODE_BUTTON_L1 },
-	{ VPAD_BUTTON_R, NKCODE_BUTTON_R1 },
-	{ VPAD_BUTTON_ZL, NKCODE_BUTTON_L2 },
+	{ VPAD_BUTTON_B, NKCODE_BUTTON_2 },
+	{ VPAD_BUTTON_A, NKCODE_BUTTON_3 },
+	{ VPAD_BUTTON_Y, NKCODE_BUTTON_4 },
+	{ VPAD_BUTTON_X, NKCODE_BUTTON_1 },
+	{ VPAD_BUTTON_L, NKCODE_BUTTON_7 },
+	{ VPAD_BUTTON_R, NKCODE_BUTTON_8 },
+	{ VPAD_BUTTON_ZL, NKCODE_BUTTON_L2 },  // Pause menu (VIRTKEY_PAUSE).
 	{ VPAD_BUTTON_ZR, NKCODE_BUTTON_R2 },
-	{ VPAD_BUTTON_PLUS, NKCODE_BUTTON_START },
-	{ VPAD_BUTTON_MINUS, NKCODE_BUTTON_SELECT },
+	{ VPAD_BUTTON_PLUS, NKCODE_BUTTON_10 },
+	{ VPAD_BUTTON_MINUS, NKCODE_BUTTON_9 },
 	{ VPAD_BUTTON_UP, NKCODE_DPAD_UP },
 	{ VPAD_BUTTON_DOWN, NKCODE_DPAD_DOWN },
 	{ VPAD_BUTTON_LEFT, NKCODE_DPAD_LEFT },
@@ -142,7 +146,7 @@ static void PollGamePad() {
 
 	// The GamePad shows the whole backbuffer, scaled to its 854x480 screen.
 	VPADTouchData tp;
-	VPADGetTPCalibratedPoint(VPAD_CHAN_0, &tp, &status.tpNormal);
+	VPADGetTPCalibratedPointEx(VPAD_CHAN_0, VPAD_TP_854X480, &tp, &status.tpFiltered1);
 	bool down = tp.touched && tp.validity == VPAD_VALID;
 	if (down || g_touchDown) {
 		TouchInput touch{};
@@ -229,11 +233,20 @@ bool System_AudioRecordingState() { return false; }
 // No audio yet: PPSSPP runs fine without a backend. (The System_Audio* helpers live in UI/.)
 AudioBackend *System_CreateAudioBackend() { return nullptr; }
 
+// Set once ProcUI has ended the main loop: from then on, no more system calls like
+// SYSLaunchMenu (they never return). NativeShutdown itself asks to exit (System_ExitApp).
+static bool g_leftForeground = false;
+static bool g_exitRequested = false;
+
 bool System_MakeRequest(SystemRequestType type, int requestId, const std::string &param1, const std::string &param2, int64_t param3, int64_t param4) {
 	switch (type) {
 	case SystemRequestType::EXIT_APP:
-		// Leave through the HOME menu, ProcUI wants to drive the exit.
-		SYSLaunchMenu();
+		// Leave through the system menu, ProcUI wants to drive the exit. Only once, and only
+		// while we're still running.
+		if (!g_leftForeground && !g_exitRequested) {
+			g_exitRequested = true;
+			SYSLaunchMenu();
+		}
 		return true;
 	default:
 		return false;
@@ -270,22 +283,41 @@ int main(int argc, char **argv) {
 
 	Native_UpdateScreenScale(g_backbufferWidth, g_backbufferHeight, 1.0f);
 
+	// Whether ProcUI still has us running. Once WHBProcIsRunning has returned false (exit),
+	// calling it again blocks forever, so remember the answer.
+	bool running = true;
 	WiiUGraphicsContext graphics;
 	if (!graphics.Init() || !NativeInitGraphics(&graphics)) {
 		BootLog("graphics init failed (see ppsspp_log.txt)");
 		ERROR_LOG(Log::System, "Wii U frontend: graphics init failed");
 	} else {
 		BootLog("graphics init done, running");
-		while (WHBProcIsRunning()) {
+		while ((running = WHBProcIsRunning())) {
 			PollGamePad();
 			NativeFrame(&graphics);
 		}
+		g_leftForeground = true;
 		BootLog("main loop done");
 		// The GPU was drained in OnReleaseForeground, and no GX2 calls are allowed from here.
 		NativeShutdownGraphics(&graphics);
+		BootLog("NativeShutdownGraphics done");
 		graphics.Shutdown();
+		BootLog("draw context destroyed");
 	}
 
+	// A Wii U app can't just return from main: ask for the HOME menu and let ProcUI drive
+	// the exit. (After an error, or EXIT_APP, the loop above ends without that.)
+	if (running) {
+		BootLog("leaving through the system menu");
+		if (!g_exitRequested)
+			SYSLaunchMenu();
+		g_exitRequested = true;
+		while (WHBProcIsRunning()) {
+		}
+	}
+	g_leftForeground = true;
+
+	BootLog("NativeShutdown...");
 	NativeShutdown();
 	BootLog("shutdown done");
 	WHBGfxShutdown();

@@ -1486,8 +1486,9 @@ static void parsePrxLibInfo(const u8* ptr, u32 headerSize) {
 	INFO_LOG(Log::sceModule, "~SCE module: Lib-PSP %s (SDK %s)", nameBuffer, versionBuffer);
 }
 
+// File magics and header words are little-endian, whatever the host is.
 inline u32 Read32(const u8 *ptr) {
-	u32 value;
+	u32_le value;
 	memcpy(&value, ptr, 4);
 	return value;
 }

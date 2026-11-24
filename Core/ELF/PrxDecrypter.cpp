@@ -791,8 +791,8 @@ struct PRXType5
 			u8 block[sizeof(KIRK_CMD1_HEADER) + sizeof(data)]{};
 			KIRK_CMD1_HEADER *header = reinterpret_cast<KIRK_CMD1_HEADER *>(block);
 			memcpy(block, cmd3Header, 0x40);
-			header->mode = KIRK_MODE_CMD3;
-			header->data_size = sizeof(data);
+			header->mode = KIRK_LE32(KIRK_MODE_CMD3);
+			header->data_size = KIRK_LE32(sizeof(data));
 			memcpy(block + sizeof(KIRK_CMD1_HEADER), data, sizeof(data));
 			if (kirk_CMD3(kirk, data, block, sizeof(block)) != KIRK_OPERATION_SUCCESS)
 			{
@@ -915,11 +915,11 @@ static bool KirkOutputFits(u32 headerSize, u32 dataOffset, u32 dataSize, u32 siz
 }
 
 static bool KirkOutputFits(const KIRK_CMD1_HEADER *header, u32 size) {
-	return KirkOutputFits(sizeof(KIRK_CMD1_HEADER), header->data_offset, header->data_size, size);
+	return KirkOutputFits(sizeof(KIRK_CMD1_HEADER), KIRK_LE32(header->data_offset), KIRK_LE32(header->data_size), size);
 }
 
 static bool KirkOutputFits(const KIRK_CMD1_ECDSA_HEADER *header, u32 size) {
-	return KirkOutputFits(sizeof(KIRK_CMD1_ECDSA_HEADER), header->data_offset, header->data_size, size);
+	return KirkOutputFits(sizeof(KIRK_CMD1_ECDSA_HEADER), KIRK_LE32(header->data_offset), KIRK_LE32(header->data_size), size);
 }
 
 static int pspDecryptType0(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 size) {
@@ -935,7 +935,11 @@ static int pspDecryptType0(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 siz
 	// no need to expand seed, and no need to decrypt
 	// normally this would be a kirk7 op, but we have the seed pre-decrypted
 	std::array<u8, 0x90> xorbuf;
-	memcpy(xorbuf.data(), reinterpret_cast<const u8 *>(pti->key), xorbuf.size());
+	for (size_t i = 0; i < xorbuf.size() / 4; i++) {
+		// The table holds the key as 32-bit words; KIRK wants their little-endian bytes.
+		const u32_le word = pti->key[i];
+		memcpy(xorbuf.data() + i * 4, &word, 4);
+	}
 	if (pti->scrambleKey)
 	{
 		// ...except for keys we have in their raw form, which need that pass after all.
@@ -998,7 +1002,11 @@ static int pspDecryptType1(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 siz
 	// no need to expand seed, and no need to decrypt
 	// normally this would be a kirk7 op, but we have the seed pre-decrypted
 	std::array<u8, 0x90> xorbuf;
-	memcpy(xorbuf.data(), reinterpret_cast<const u8 *>(pti->key), xorbuf.size());
+	for (size_t i = 0; i < xorbuf.size() / 4; i++) {
+		// The table holds the key as 32-bit words; KIRK wants their little-endian bytes.
+		const u32_le word = pti->key[i];
+		memcpy(xorbuf.data() + i * 4, &word, 4);
+	}
 
 	// construct the header format for a type 1 prx
 	PRXType1 type1(inbuf);
@@ -1097,7 +1105,7 @@ static int pspDecryptType2(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 siz
 	memcpy(reinterpret_cast<u8*>(&header->data_size), type2.kirkMetadata, sizeof(type2.kirkMetadata));
 	memcpy(reinterpret_cast<u8*>(header)+sizeof(KIRK_CMD1_HEADER), type2.prxHeader, sizeof(type2.prxHeader));
 	decryptKirkHeader(reinterpret_cast<u8*>(header), type2.kirkHeader, xorbuf.cbegin()+0x10, pti->code);
-	header->mode = 1;
+	header->mode = KIRK_LE32(1);
 
 	if (!KirkOutputFits(header, size - offset))
 	{
@@ -1148,7 +1156,7 @@ static int pspFinishType5(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 size
 	memcpy(reinterpret_cast<u8*>(&header->data_size), type5.kirkMetadata, sizeof(type5.kirkMetadata));
 	memcpy(reinterpret_cast<u8*>(header)+sizeof(KIRK_CMD1_HEADER), type5.prxHeader, sizeof(type5.prxHeader));
 	decryptKirkHeader(reinterpret_cast<u8*>(header), type5.kirkHeader, xorbuf.cbegin()+0x10, code);
-	header->mode = 1;
+	header->mode = KIRK_LE32(1);
 
 	if (!KirkOutputFits(header, size - offset))
 	{
@@ -1272,7 +1280,7 @@ static int pspDecryptType6(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 siz
 	memcpy(reinterpret_cast<u8*>(&header->data_size), type6.kirkMetadata, sizeof(type6.kirkMetadata));
 	memcpy(reinterpret_cast<u8*>(header)+sizeof(KIRK_CMD1_ECDSA_HEADER), type6.prxHeader, sizeof(type6.prxHeader));
 	decryptKirkHeader(reinterpret_cast<u8*>(header), type6.kirkHeader, xorbuf.cbegin()+0x10, pti->code);
-	header->mode = 1;
+	header->mode = KIRK_LE32(1);
 	header->ecdsa_hash = 1;
 
 	if (!KirkOutputFits(header, size - offset))
@@ -1346,7 +1354,7 @@ static int pspDecryptType9(KirkState *kirk, const u8 *inbuf, u8 *outbuf, u32 siz
 	memcpy(reinterpret_cast<u8*>(&header->data_size), type9.kirkMetadata, sizeof(type9.kirkMetadata));
 	memcpy(reinterpret_cast<u8*>(header)+sizeof(KIRK_CMD1_ECDSA_HEADER), type9.prxHeader, sizeof(type9.prxHeader));
 	decryptKirkHeader(reinterpret_cast<u8*>(header), type9.kirkHeader, xorbuf.cbegin()+0x10, pti->code);
-	header->mode = 1;
+	header->mode = KIRK_LE32(1);
 	// Left at 0, unlike type 6/7 which set it: type 9 carries a real ECDSA signature that was
 	// verified separately, so KIRK is not asked to hash-check this block. JPCSP's equivalent
 	// branch only writes the mode word and zeroes the rest of that region.
@@ -1387,11 +1395,11 @@ static bool UnsignCheckHeader(KirkState *kirk, u8 *header) {
 	u8 enc[sizeof(KIRK_AES128CBC_HEADER) + 0xD0];
 	KIRK_AES128CBC_HEADER *aes = reinterpret_cast<KIRK_AES128CBC_HEADER *>(enc);
 	u8 *data = enc + sizeof(KIRK_AES128CBC_HEADER);
-	aes->mode = KIRK_MODE_DECRYPT_CBC;
-	aes->unk_4 = 0;
-	aes->unk_8 = 0;
-	aes->keyseed = 0x100;
-	aes->data_size = 0xD0;
+	aes->mode = KIRK_LE32(KIRK_MODE_DECRYPT_CBC);
+	aes->unk_4 = KIRK_LE32(0);
+	aes->unk_8 = KIRK_LE32(0);
+	aes->keyseed = KIRK_LE32(0x100);
+	aes->data_size = KIRK_LE32(0xD0);
 	for (int i = 0; i < 0xD0; i++) {
 		data[i] = header[0x80 + i] ^ g_signcheckKeys1[i & 0xF];
 	}
@@ -1413,11 +1421,11 @@ bool pspSignCheckHeader(u8 *header, const u32 *fuseId) {
 	u8 enc[sizeof(KIRK_AES128CBC_HEADER) + 0xD0];
 	KIRK_AES128CBC_HEADER *aes = reinterpret_cast<KIRK_AES128CBC_HEADER *>(enc);
 	u8 *data = enc + sizeof(KIRK_AES128CBC_HEADER);
-	aes->mode = KIRK_MODE_ENCRYPT_CBC;
-	aes->unk_4 = 0;
-	aes->unk_8 = 0;
-	aes->keyseed = 0x100;
-	aes->data_size = 0xD0;
+	aes->mode = KIRK_LE32(KIRK_MODE_ENCRYPT_CBC);
+	aes->unk_4 = KIRK_LE32(0);
+	aes->unk_8 = KIRK_LE32(0);
+	aes->keyseed = KIRK_LE32(0x100);
+	aes->data_size = KIRK_LE32(0xD0);
 	memcpy(data, header + 0x110, 0x40);
 	memcpy(data + 0x40, header + 0x80, 0x90);
 	for (int i = 0; i < 0xD0; i++) {
@@ -1658,7 +1666,7 @@ bool pspReadDrmBBPackage(const std::vector<u8> &pbp, const u8 *secureIdIn, std::
 	}
 	const u8 *paramKey = header + 0x10;
 	const u8 *fileKey = header + 0x20;
-	const u32 *h = (const u32 *)(header + 0x30);
+	const u32_le *h = (const u32_le *)(header + 0x30);
 	if (h[0] != 1 || h[2] != 1) {
 		return false;
 	}
@@ -1687,7 +1695,7 @@ bool pspReadDrmBBPackage(const std::vector<u8> &pbp, const u8 *secureIdIn, std::
 	}
 	u32 fileCount = 0;
 	for (u32 i = 0; i < paramCount; i++) {
-		const u32 *p = (const u32 *)&params[i * 8];
+		const u32_le *p = (const u32_le *)&params[i * 8];
 		if (p[0] == 0x01010100) {
 			fileCount = p[1];
 		}
@@ -1704,10 +1712,10 @@ bool pspReadDrmBBPackage(const std::vector<u8> &pbp, const u8 *secureIdIn, std::
 		if (!readBlocks(fileTable, i * 16, 16, fileKey, entry)) {
 			return false;
 		}
-		const u16 nameOffset = *(const u16 *)&entry[0];
-		const u16 nameLength = *(const u16 *)&entry[2];
-		const u32 dataOffset = *(const u32 *)&entry[4];
-		const u32 dataSize = *(const u32 *)&entry[8];
+		const u16 nameOffset = *(const u16_le *)&entry[0];
+		const u16 nameLength = *(const u16_le *)&entry[2];
+		const u32 dataOffset = *(const u32_le *)&entry[4];
+		const u32 dataSize = *(const u32_le *)&entry[8];
 		if (!readBlocks(fileTable, nameOffset, nameLength, fileKey, name)) {
 			return false;
 		}
