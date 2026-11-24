@@ -1,12 +1,16 @@
 // PPSSPP Wii U port: hardware test.
 //
-// Part 1 (text on the screens): runs the checks below and writes them to
-// sd:/ppsspp_wiiu_test.txt too. Press A to continue.
-// Part 2 (GX2): a spinning triangle drawn with shaders compiled on the console by CafeGLSL.
-// Its tint comes from a uniform block written in little-endian byte order:
-//   colored triangle -> uniform blocks want little-endian data (expected)
-//   black triangle   -> they want native (big-endian) data
-// HOME exits.
+// Runs by itself, in stages, and appends each stage it reaches to sd:/ppsspp_wiiu_test.txt,
+// so a black screen still tells us how far it got.
+//   1. Text (OSScreen): the checks below. 8 seconds, or A to skip.
+//   2. GX2 clear only: the background fades between grey and white.
+//   3. Triangle, shaders without uniforms. Dark green background.
+//   4. Triangle tinted by a uniform block in little-endian order. Dark blue background.
+//   5. Same, uniform block in native (big-endian) order. Dark red background.
+// Stages 2-5 last 5 seconds each and then repeat. HOME exits.
+//
+// In 4 and 5, one of the two triangles should be colored and the other black: the colored
+// one tells which byte order GX2 uniform blocks want.
 
 #include <atomic>
 #include <cstdarg>
@@ -48,6 +52,24 @@ static void Report(const char *fmt, ...) {
 	WHBLogPrint(buf);
 	g_report += buf;
 	g_report += "\n";
+}
+
+static const char *kReportPath = "fs:/vol/external01/ppsspp_wiiu_test.txt";
+
+// Appends a line to the report on the SD card right away (open, write, close), so it
+// survives a hang.
+static void Progress(const char *fmt, ...) {
+	char buf[256];
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+	WHBLogPrint(buf);
+	FILE *f = fopen(kReportPath, "a");
+	if (f) {
+		fprintf(f, "%s\n", buf);
+		fclose(f);
+	}
 }
 
 static bool Check(const char *name, bool ok, const std::string &detail = "") {
@@ -120,7 +142,15 @@ void main() {
 }
 )";
 
-static const char *kPixelShader = R"(#version 450
+static const char *kPixelShaderPlain = R"(#version 450
+layout(location = 0) in vec3 vColor;
+layout(location = 0) out vec4 fragColor;
+void main() {
+	fragColor = vec4(vColor, 1.0);
+}
+)";
+
+static const char *kPixelShaderTint = R"(#version 450
 layout(location = 0) in vec3 vColor;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 1) uniform Tint {
@@ -131,29 +161,40 @@ void main() {
 }
 )";
 
-static GX2VertexShader *g_vs;
-static GX2PixelShader *g_ps;
-static GX2ShaderMode g_shaderMode;
+struct Program {
+	GX2VertexShader *vs = nullptr;
+	GX2PixelShader *ps = nullptr;
+	GX2ShaderMode mode = GLSL_SHADER_MODE_ERROR;
+	WHBGfxShaderGroup group = {};
+};
 
-static bool CompileShaders() {
-	InitGLSLCompiler();
-	Report("CafeGLSL %s", GetGLSLCompilerVersion());
+static Program g_plain, g_tint;
+
+static bool CompileProgram(Program &prog, const char *name, const char *ps, GLSLCompileMode mode) {
 	char log[2048] = {};
-	g_shaderMode = CompileShaderPair(kVertexShader, kPixelShader, GLSL_COMPILE_BLOCK, &g_vs, &g_ps, log, sizeof(log), GLSL_COMPILER_FLAG_NONE);
-	bool ok = g_shaderMode != GLSL_SHADER_MODE_ERROR && g_vs && g_ps;
+	prog.mode = CompileShaderPair(kVertexShader, ps, mode, &prog.vs, &prog.ps, log, sizeof(log), GLSL_COMPILER_FLAG_NONE);
+	bool ok = prog.mode != GLSL_SHADER_MODE_ERROR && prog.vs && prog.ps;
 	char d[128];
 	if (ok)
-		snprintf(d, sizeof(d), "mode=%d, vs attribs=%u, ps blocks=%u", (int)g_shaderMode, (unsigned)g_vs->attribVarCount, (unsigned)g_ps->uniformBlockCount);
+		snprintf(d, sizeof(d), "mode=%d, vs attribs=%u, ps blocks=%u", (int)prog.mode, (unsigned)prog.vs->attribVarCount, (unsigned)prog.ps->uniformBlockCount);
 	else
 		snprintf(d, sizeof(d), "see log below");
-	Check("CafeGLSL compile on console", ok, d);
+	Check(name, ok, d);
 	if (log[0])
 		Report("%s", log);
 	return ok;
 }
 
+static bool CompileShaders() {
+	InitGLSLCompiler();
+	Report("CafeGLSL %s", GetGLSLCompilerVersion());
+	bool ok = CompileProgram(g_plain, "CafeGLSL compile (no uniforms)", kPixelShaderPlain, GLSL_COMPILE_AUTO);
+	ok &= CompileProgram(g_tint, "CafeGLSL compile (uniform block)", kPixelShaderTint, GLSL_COMPILE_BLOCK);
+	return ok;
+}
+
 static void WriteReportToSD() {
-	FILE *f = fopen("fs:/vol/external01/ppsspp_wiiu_test.txt", "w");
+	FILE *f = fopen(kReportPath, "w");
 	if (f) {
 		fwrite(g_report.data(), 1, g_report.size(), f);
 		fclose(f);
@@ -177,100 +218,104 @@ static u32 SwapFloatBits(float f) {
 	return __builtin_bswap32(bits);
 }
 
+static u32 NativeFloatBits(float f) {
+	u32 bits;
+	memcpy(&bits, &f, 4);
+	return bits;
+}
+
+static bool SetupGroup(Program &prog) {
+	prog.group.vertexShader = prog.vs;
+	prog.group.pixelShader = prog.ps;
+	bool ok = WHBGfxInitShaderAttribute(&prog.group, "aPos", 0, 0, GX2_ATTRIB_FORMAT_FLOAT_32_32);
+	ok = WHBGfxInitShaderAttribute(&prog.group, "aColor", 0, 8, GX2_ATTRIB_FORMAT_FLOAT_32_32_32) && ok;
+	ok = WHBGfxInitFetchShader(&prog.group) && ok;
+	return ok;
+}
+
+// One check per press of A, with the text screen drawn in between, so a check that kills the
+// video shows up as the last line still visible. Each step is also appended to the SD report.
+struct Step {
+	const char *name;
+	bool (*run)();
+};
+
+static bool StepUdp() { WHBLogUdpInit(); return true; }
+static bool StepCafeInit() { InitGLSLCompiler(); Report("CafeGLSL %s", GetGLSLCompilerVersion()); return true; }
+static bool StepCompilePlain() { return CompileProgram(g_plain, "CafeGLSL compile (no uniforms)", kPixelShaderPlain, GLSL_COMPILE_AUTO); }
+static bool StepCompileTint() { return CompileProgram(g_tint, "CafeGLSL compile (uniform block)", kPixelShaderTint, GLSL_COMPILE_BLOCK); }
+
+static const Step kSteps[] = {
+	{ "u32_le / float_le", TestLittleEndian },
+	{ "thread-local emulation (1 thread)", TestThreadLocal },
+	{ "64-bit compare-exchange (no threads)", TestAtomic64CAS },
+	{ "64-bit atomic counter (3 threads)", TestSum },
+	{ "UDP log init", StepUdp },
+	{ "CafeGLSL init", StepCafeInit },
+	{ "CafeGLSL compile, no uniforms", StepCompilePlain },
+	{ "CafeGLSL compile, uniform block", StepCompileTint },
+};
+
+static void DrawFor(int ms) {
+	OSTime start = OSGetSystemTime();
+	while (WHBProcIsRunning() && OSTicksToMilliseconds(OSGetSystemTime() - start) < ms) {
+		WHBLogConsoleDraw();
+		OSSleepTicks(OSMillisecondsToTicks(16));
+	}
+}
+
 int main(int argc, char **argv) {
 	WHBProcInit();
-	WHBLogUdpInit();
 	WHBLogConsoleInit();
 
-	Report("PPSSPP Wii U port - hardware test");
-	Report("---------------------------------");
-	bool allOk = true;
-	allOk &= TestLittleEndian();
-	allOk &= TestThreadLocal();
-	allOk &= TestSum();
-	allOk &= TestAtomic64CAS();
-	bool shadersOk = CompileShaders();
-	allOk &= shadersOk;
-	Report("---------------------------------");
-	Report(allOk ? "All checks passed." : "Some checks FAILED.");
-	WriteReportToSD();
-	Report("");
-	Report(shadersOk ? "Press A for the GX2 triangle, HOME to exit." : "HOME to exit.");
+	FILE *f = fopen(kReportPath, "w");
+	if (f)
+		fclose(f);
 
-	bool toGfx = false;
+	Report("PPSSPP Wii U port - all checks before the first frame (diagnostic 4)");
+	Progress("start: console initialized, nothing drawn yet");
+	const int total = (int)(sizeof(kSteps) / sizeof(kSteps[0]));
+#ifdef CHECKS_BEFORE_FIRST_FRAME
+	// Teste G: the checks run before anything is drawn, like the first test app, except
+	// for the UDP log, which Teste F covers.
+	for (int i = 0; i < total; i++) {
+		if (kSteps[i].run == StepUdp)
+			continue;
+		Progress("step %d (%s): starting", i + 1, kSteps[i].name);
+		bool ok = kSteps[i].run();
+		Progress("step %d (%s): %s", i + 1, kSteps[i].name, ok ? "ok" : "FAILED");
+		Report("Step %d: %s: %s", i + 1, kSteps[i].name, ok ? "ok" : "FAILED");
+	}
+	Report("All checks ran before the first frame.");
+	Report("If you can read this, they don't kill the video. HOME to exit.");
+	Progress("first frame now");
+#endif
+
+	const int count = total;
+#ifdef CHECKS_BEFORE_FIRST_FRAME
+	int next = count;
+#else
+	int next = 0;
+#endif
 	while (WHBProcIsRunning()) {
 		WHBLogConsoleDraw();
-		if (shadersOk && PressedA()) {
-			toGfx = true;
-			break;
+		if (next < count && PressedA()) {
+			Report("");
+			Report("Step %d/%d: %s ...", next + 1, count, kSteps[next].name);
+			DrawFor(300);  // Make sure this line reaches the screen before the step runs.
+			Progress("step %d (%s): starting", next + 1, kSteps[next].name);
+			bool ok = kSteps[next].run();
+			Progress("step %d (%s): %s", next + 1, kSteps[next].name, ok ? "ok" : "FAILED");
+			Report("Step %d done: %s. %s", next + 1, ok ? "ok" : "FAILED", next + 1 < count ? "A: next" : "All steps done, HOME to exit.");
+			next++;
 		}
 		OSSleepTicks(OSMillisecondsToTicks(16));
 	}
+	Progress("exit requested");
+
+	FreeShaders(g_plain.vs, g_plain.ps);
+	FreeShaders(g_tint.vs, g_tint.ps);
 	WHBLogConsoleFree();
-
-	if (toGfx && WHBGfxInit()) {
-		WHBGfxShaderGroup group = {};
-		group.vertexShader = g_vs;
-		group.pixelShader = g_ps;
-		WHBGfxInitShaderAttribute(&group, "aPos", 0, 0, GX2_ATTRIB_FORMAT_FLOAT_32_32);
-		WHBGfxInitShaderAttribute(&group, "aColor", 0, 8, GX2_ATTRIB_FORMAT_FLOAT_32_32_32);
-		WHBGfxInitFetchShader(&group);
-
-		const uint32_t stride = 5 * sizeof(float);
-		float *verts = (float *)MEMAllocFromDefaultHeapEx(3 * stride, GX2_VERTEX_BUFFER_ALIGNMENT);
-		u32 *tint = (u32 *)MEMAllocFromDefaultHeapEx(GX2_UNIFORM_BLOCK_ALIGNMENT, GX2_UNIFORM_BLOCK_ALIGNMENT);
-		// Little-endian on purpose, see the top of the file.
-		tint[0] = SwapFloatBits(1.0f);
-		tint[1] = SwapFloatBits(1.0f);
-		tint[2] = SwapFloatBits(1.0f);
-		tint[3] = SwapFloatBits(1.0f);
-		GX2Invalidate((GX2InvalidateMode)(GX2_INVALIDATE_MODE_CPU | GX2_INVALIDATE_MODE_UNIFORM_BLOCK), tint, GX2_UNIFORM_BLOCK_ALIGNMENT);
-		uint32_t tintLocation = g_ps->uniformBlockCount ? g_ps->uniformBlocks[0].offset : 1;
-
-		float angle = 0.0f;
-		while (WHBProcIsRunning()) {
-			static const float colors[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
-			for (int i = 0; i < 3; i++) {
-				float a = angle + i * 2.0943951f;
-				verts[i * 5 + 0] = 0.7f * sinf(a);
-				verts[i * 5 + 1] = 0.7f * cosf(a);
-				verts[i * 5 + 2] = colors[i][0];
-				verts[i * 5 + 3] = colors[i][1];
-				verts[i * 5 + 4] = colors[i][2];
-			}
-			GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, verts, 3 * stride);
-			angle += 0.02f;
-
-			WHBGfxBeginRender();
-			for (int screen = 0; screen < 2; screen++) {
-				if (screen == 0)
-					WHBGfxBeginRenderTV();
-				else
-					WHBGfxBeginRenderDRC();
-				WHBGfxClearColor(0.1f, 0.1f, 0.2f, 1.0f);
-				GX2SetShaderMode(g_shaderMode);
-				GX2SetFetchShader(&group.fetchShader);
-				GX2SetVertexShader(g_vs);
-				GX2SetPixelShader(g_ps);
-				GX2SetPixelUniformBlock(tintLocation, 16, tint);
-				GX2SetAttribBuffer(0, 3 * stride, stride, verts);
-				GX2DrawEx(GX2_PRIMITIVE_MODE_TRIANGLES, 3, 0, 1);
-				if (screen == 0)
-					WHBGfxFinishRenderTV();
-				else
-					WHBGfxFinishRenderDRC();
-			}
-			WHBGfxFinishRender();
-		}
-
-		MEMFreeToDefaultHeap(verts);
-		MEMFreeToDefaultHeap(tint);
-		WHBGfxShutdown();
-	}
-
-	FreeShaders(g_vs, g_ps);
-	DestroyGLSLCompiler();
-	WHBLogUdpDeinit();
 	WHBProcShutdown();
 	return 0;
 }

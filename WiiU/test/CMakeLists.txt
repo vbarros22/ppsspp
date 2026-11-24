@@ -15,6 +15,20 @@ target_link_libraries(ppsspp_wiiu_test PRIVATE cafeglsl::cafeglsl)
 
 wut_create_rpx(ppsspp_wiiu_test)
 wut_create_wuhb(ppsspp_wiiu_test
-	NAME "PPSSPP Wii U test"
-	SHORTNAME "PPSSPP test"
+	NAME "PPSSPP passo a passo"
+	SHORTNAME "PPSSPP passo"
 	AUTHOR "vbarros22")
+
+# Teste G: every check except the UDP log runs before the first frame.
+add_executable(teste_g_antes main.cpp ${PPSSPP_ROOT}/Common/WiiU/Atomic64.c)
+target_include_directories(teste_g_antes PRIVATE ${PPSSPP_ROOT})
+target_compile_definitions(teste_g_antes PRIVATE CHECKS_BEFORE_FIRST_FRAME)
+target_link_libraries(teste_g_antes PRIVATE cafeglsl::cafeglsl)
+wut_create_rpx(teste_g_antes)
+wut_create_wuhb(teste_g_antes NAME "Teste G verificacoes antes" SHORTNAME "Teste G" AUTHOR "vbarros22")
+
+# GX2 test: one stage per press of A (see the top of gx2_test.cpp).
+add_executable(ppsspp_wiiu_gx2_test gx2_test.cpp)
+target_link_libraries(ppsspp_wiiu_gx2_test PRIVATE cafeglsl::cafeglsl)
+wut_create_rpx(ppsspp_wiiu_gx2_test)
+wut_create_wuhb(ppsspp_wiiu_gx2_test NAME "PPSSPP GX2 test" SHORTNAME "PPSSPP GX2" AUTHOR "vbarros22")
