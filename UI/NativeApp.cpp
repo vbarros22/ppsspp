@@ -677,7 +677,7 @@ void NativeInit(int argc, const char *argv[], const CommandLineOptions &cmdLineO
 #if defined(ASSETS_DIR)
 	g_VFS.Register("", new DirectoryReader(Path(ASSETS_DIR)));
 #endif
-#if !defined(MOBILE_DEVICE) && !defined(_WIN32) && !PPSSPP_PLATFORM(SWITCH)
+#if !defined(MOBILE_DEVICE) && !defined(_WIN32) && !PPSSPP_PLATFORM(SWITCH) && !PPSSPP_PLATFORM(WIIU)
 	g_VFS.Register("", new DirectoryReader(File::GetExeDirectory() / "assets"));
 	g_VFS.Register("", new DirectoryReader(File::GetExeDirectory()));
 	g_VFS.Register("", new DirectoryReader(Path("/usr/local/share/ppsspp/assets")));
@@ -690,7 +690,7 @@ void NativeInit(int argc, const char *argv[], const CommandLineOptions &cmdLineO
 	g_VFS.Register("", new DirectoryReader(exePath));
 #endif
 
-#if PPSSPP_PLATFORM(SWITCH)
+#if PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU)
 	Path assetPath = Path(user_data_path) / "assets";
 	g_VFS.Register("", new DirectoryReader(assetPath));
 #else
@@ -781,6 +781,10 @@ void NativeInit(int argc, const char *argv[], const CommandLineOptions &cmdLineO
 	g_Config.memStickDirectory = DarwinFileSystemServices::appropriateMemoryStickDirectoryToUse();
 #elif PPSSPP_PLATFORM(SWITCH)
 	g_Config.memStickDirectory = g_Config.internalDataDirectory / "config/ppsspp";
+#elif PPSSPP_PLATFORM(WIIU)
+	// The frontend passes the memory stick (sd:/ppsspp) as external_dir. Browse from the SD root.
+	g_Config.memStickDirectory = Path(external_dir);
+	g_Config.defaultCurrentDirectory = Path("fs:/vol/external01/");
 #elif PPSSPP_PLATFORM(WINDOWS)
 	// ...
 #else

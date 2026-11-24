@@ -186,6 +186,7 @@ add_library(Common STATIC
 	GPU/GPUBackendCommon.cpp
 	GPU/GPUBackendCommon.h
 	GPU/thin3d.cpp
+	GPU/GX2/thin3d_gx2.cpp
 	GPU/thin3d.h
 	GPU/thin3d_create.h
 	GPU/Shader.cpp
@@ -408,6 +409,12 @@ if(IOS AND NOT NO_OPENGL)
 endif()
 
 target_link_libraries(Common Ext::Snappy cpu_features)
+
+if(WIIU)
+	# GX2 backend: shaders are compiled on the console with CafeGLSL.
+	find_package(cafeglsl REQUIRED)
+	target_link_libraries(Common cafeglsl::cafeglsl)
+endif()
 
 if(SDL_LIB_TARGET AND TARGET SDL3::Headers)
 	target_link_libraries(Common SDL3::Headers)

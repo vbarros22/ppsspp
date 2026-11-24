@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ppsspp_config.h"
+
 #include <string>
 #include <vector>
 #include "Common/GPU/thin3d.h"
@@ -33,6 +35,11 @@ DrawContext *T3DCreateD3D11Context(Microsoft::WRL::ComPtr<ID3D11Device> device, 
 #endif
 
 DrawContext *T3DCreateVulkanContext(VulkanContext *context, bool useRenderThread);
+
+#if PPSSPP_PLATFORM(WIIU)
+// The TV color and depth buffers (GX2ColorBuffer *, GX2DepthBuffer *) serve as the backbuffer.
+DrawContext *T3DCreateGX2Context(void *tvColorBuffer, void *tvDepthBuffer);
+#endif
 
 #ifdef __APPLE__
 DrawContext *T3DCreateMetalContext(MetalRenderManager *renderManager);

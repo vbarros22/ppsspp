@@ -107,8 +107,9 @@ if(WIIU)
 	set(ARM_NO_VULKAN ON)
 	# No mmap/shared memory views: PSP memory is one plain allocation.
 	set(USE_NO_MMAP ON CACHE BOOL "" FORCE)
-	# No dynamic loading.
+	# No dynamic loading, no processes to launch.
 	set(CMAKE_DL_LIBS "")
+	add_compile_definitions(IMGUI_DISABLE_DEFAULT_SHELL_FUNCTIONS)
 	# wut has no thread-local storage: use Common/Thread/ThreadLocal.h instead of thread_local.
 	add_compile_definitions(SOL_NO_THREAD_LOCAL=1)
 	# The Wii U network stack has no IPv6.
@@ -131,7 +132,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 include(CheckCXXSourceCompiles)
 include(GNUInstallDirs)
 
-add_compile_definitions(ASSETS_DIR="${CMAKE_INSTALL_FULL_DATADIR}/ppsspp/assets/")
+if(NOT WIIU)
+	add_compile_definitions(ASSETS_DIR="${CMAKE_INSTALL_FULL_DATADIR}/ppsspp/assets/")
+endif()
 
 if(OPENXR AND NOT ARMV7_DEVICE)
 	add_compile_definitions(OPENXR)
@@ -373,7 +376,7 @@ set(SDL_LIB_TARGET "")
 set(SDL_TTF_LIB_TARGET "")
 set(FONTCONFIG_LIB_TARGET "")
 
-if(NOT LIBRETRO AND NOT IOS AND NOT HEADLESS_CROSS AND NOT ANDROID)
+if(NOT LIBRETRO AND NOT IOS AND NOT HEADLESS_CROSS AND NOT ANDROID AND NOT WIIU)
 	find_package(SDL3 QUIET)
 	if(NOT SDL3_FOUND)
 		if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND (EXISTS "/usr/bin/apt" OR EXISTS "/usr/bin/apt-get" OR EXISTS "/etc/debian_version"))
@@ -1002,6 +1005,9 @@ elseif(WIN32)
 	# Don't care about SDL.
 	set(TargetBin PPSSPPWindows)
 elseif(LIBRETRO)
+elseif(WIIU)
+	set(TargetBin PPSSPPWiiU)
+	list(APPEND targetExtra WiiU/WiiUMain.cpp)
 elseif(HEADLESS_CROSS)
 	# The loongarch64/riscv64 cross builds only build PPSSPPHeadless, and there's no
 	# SDL3 available in those sysroots, so skip the desktop SDL frontend entirely.
@@ -1574,6 +1580,10 @@ if(TargetBin)
 		target_link_libraries(${TargetBin} ws2_32 winmm)
 	elseif(${CMAKE_SYSTEM_NAME} MATCHES "^(DragonFly|FreeBSD|NetBSD)$")
 		target_link_libraries(${TargetBin} execinfo)
+	endif()
+	if(WIIU)
+		wut_create_rpx(${TargetBin})
+		wut_create_wuhb(${TargetBin} NAME "PPSSPP" SHORTNAME "PPSSPP" AUTHOR "PPSSPP Team / Wii U port")
 	endif()
 endif()
 
