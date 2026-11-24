@@ -138,10 +138,9 @@ public:
 		switch (decFmt_.c0fmt) {
 		case DEC_U8_4:
 		{
+			// R, G, B, A bytes to a value with R in the low byte, on any host.
 			const u8 *b = (const u8 *)(data_ + decFmt_.c0off);
-			u32 value;
-			memcpy(&value, b, 4);
-			return value;
+			return (u32)b[0] | ((u32)b[1] << 8) | ((u32)b[2] << 16) | ((u32)b[3] << 24);
 		}
 		break;
 		case DEC_FLOAT_4:

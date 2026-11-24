@@ -842,8 +842,8 @@ SoftDirty TransformUnit::GetDirty() {
 static float ReadRawComponent(const u8 *p, int fmt, int i) {
 	switch (fmt) {
 	case 1: return ((const s8 *)p)[i] * (1.0f / 128.0f);
-	case 2: { s16 v; memcpy(&v, p + 2 * i, 2); return v * (1.0f / 32768.0f); }
-	case 3: { float v; memcpy(&v, p + 4 * i, 4); return v; }
+	case 2: { s16_le v; memcpy(&v, p + 2 * i, 2); return (s16)v * (1.0f / 32768.0f); }
+	case 3: { float_le v; memcpy(&v, p + 4 * i, 4); return (float)v; }
 	default: return 0.0f;
 	}
 }
@@ -851,8 +851,8 @@ static float ReadRawComponent(const u8 *p, int fmt, int i) {
 static float ReadRawWeight(const u8 *p, int fmt, int i) {
 	switch (fmt) {
 	case 1: return p[i] * (1.0f / 128.0f);
-	case 2: { u16 v; memcpy(&v, p + 2 * i, 2); return v * (1.0f / 32768.0f); }
-	case 3: { float v; memcpy(&v, p + 4 * i, 4); return v; }
+	case 2: { u16_le v; memcpy(&v, p + 2 * i, 2); return (u16)v * (1.0f / 32768.0f); }
+	case 3: { float_le v; memcpy(&v, p + 4 * i, 4); return (float)v; }
 	default: return 0.0f;
 	}
 }
@@ -990,8 +990,10 @@ static void ApplyGESkinning(u8 *decoded, const VertexDecoder &dec, const u8 *raw
 
 // A vertex color channel (0 r, 1 g, 2 b, 3 a) expanded to 8 bits.
 static float ReadRawColorChannel(const u8 *p, int fmt, int c) {
-	u16 v16;
-	memcpy(&v16, p, 2);
+	// PSP memory is little-endian.
+	u16_le v16le;
+	memcpy(&v16le, p, 2);
+	const u16 v16 = v16le;
 	switch (fmt) {
 	case GE_VTYPE_COL_565 >> GE_VTYPE_COL_SHIFT: {
 		const u32 c8 = RGB565ToRGBA8888(v16);

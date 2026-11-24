@@ -53,7 +53,6 @@
 // Bring-up diagnostics: how many primitives were drawn, reported with the displayed frame.
 static int g_wiiuPrimsSinceReport;
 static int g_wiiuFramesSinceReport;
-static int g_wiiuTestBarFrames;
 #endif
 
 constexpr int FB_WIDTH = 480;
@@ -403,9 +402,6 @@ const SoftwareCommandTableEntry softgpuCommandTable[] = {
 SoftGPU::SoftGPU(GraphicsContext *gfxCtx, Draw::DrawContext *draw)
 	: GPUCommon(gfxCtx, draw)
 {
-#if PPSSPP_PLATFORM(WIIU)
-	g_wiiuTestBarFrames = 0;
-#endif
 	fb.data = Memory::GetPointerWriteOrException(0x44000000); // TODO: correct default address?
 	depthbuf.vram = Memory::GetPointerWriteOrException(0x04000000);
 	UpdateDepthBuffer();
@@ -738,32 +734,6 @@ void SoftGPU::CopyToCurrentFboFromDisplayRam(const DisplayLayoutConfig &config, 
 			nonZero, total, sample, g_wiiuPrimsSinceReport, g_wiiuFramesSinceReport);
 		g_wiiuPrimsSinceReport = 0;
 		g_wiiuFramesSinceReport = 0;
-	}
-#endif
-#if PPSSPP_PLATFORM(WIIU)
-	// Bring-up test: the first 3 seconds of each game show color bars instead, to tell a broken
-	// presentation apart from a broken renderer. White, yellow, cyan, green, magenta, red, blue, black.
-	if (g_wiiuTestBarFrames < 180) {
-		g_wiiuTestBarFrames++;
-		static std::vector<u8> bars;
-		if (bars.empty()) {
-			static const u8 colors[8][3] = { {255,255,255}, {255,255,0}, {0,255,255}, {0,255,0}, {255,0,255}, {255,0,0}, {0,0,255}, {0,0,0} };
-			bars.resize(512 * 272 * 4);
-			for (int y = 0; y < 272; y++) {
-				for (int x = 0; x < 512; x++) {
-					const u8 *c = colors[std::min(x * 8 / 480, 7)];
-					u8 *px = &bars[(y * 512 + x) * 4];
-					px[0] = c[0]; px[1] = c[1]; px[2] = c[2]; px[3] = 255;
-				}
-			}
-		}
-		desc.format = Draw::DataFormat::R8G8B8A8_UNORM;
-		desc.width = 512;
-		desc.height = 272;
-		desc.initData.clear();
-		desc.initData.push_back(bars.data());
-		u0 = 0.0f; v0 = 0.0f; u1 = 480.0f / 512.0f; v1 = 1.0f;
-		outputFlags &= ~OutputFlags::RB_SWIZZLE;
 	}
 #endif
 	fbTex = draw_->CreateTexture(desc);
