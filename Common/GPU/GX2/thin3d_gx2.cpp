@@ -854,7 +854,7 @@ Texture *GX2DrawContext::CreateTexture(const TextureDesc &desc) {
 		tex->Release();
 		return nullptr;
 	}
-	INFO_LOG(Log::G3D, "GX2: CreateTexture '%s' %dx%d %s (%d levels, %d init), pitch %u, %u bytes", desc.tag ? desc.tag : "", desc.width, desc.height,
+	DEBUG_LOG(Log::G3D, "GX2: CreateTexture '%s' %dx%d %s (%d levels, %d init), pitch %u, %u bytes", desc.tag ? desc.tag : "", desc.width, desc.height,
 		DataFormatToString(desc.format), desc.mipLevels, (int)desc.initData.size(), tex->tex.surface.pitch, tex->tex.surface.imageSize);
 	return tex;
 }

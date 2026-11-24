@@ -49,6 +49,12 @@
 #include "GPU/Common/SplineCommon.h"
 #include "GPU/Debugger/Record.h"
 
+#if PPSSPP_PLATFORM(WIIU)
+// Bring-up diagnostics: how many primitives were drawn, reported with the displayed frame.
+static int g_wiiuPrimsSinceReport;
+static int g_wiiuFramesSinceReport;
+#endif
+
 constexpr int FB_WIDTH = 480;
 constexpr int FB_HEIGHT = 272;
 
@@ -688,6 +694,32 @@ void SoftGPU::CopyToCurrentFboFromDisplayRam(const DisplayLayoutConfig &config, 
 		return;
 	}
 
+#if PPSSPP_PLATFORM(WIIU)
+	// Every 60 displayed frames: is the image the game shows empty, or is it lost on the way out?
+	if (++g_wiiuFramesSinceReport >= 60) {
+		int nonZero = 0, total = 0;
+		u32 sample = 0;
+		const u8 *src = desc.initData.empty() ? nullptr : desc.initData[0];
+		const int bpp = desc.format == Draw::DataFormat::R8G8B8A8_UNORM ? 4 : 2;
+		if (src) {
+			total = desc.width * desc.height;
+			for (int i = 0; i < total; i++) {
+				u32 v = 0;
+				memcpy(&v, src + (size_t)i * bpp, bpp);
+				if (bpp == 4 ? (v & 0xFFFFFF00) != 0 : v != 0) {
+					if (!nonZero)
+						sample = v;
+					nonZero++;
+				}
+			}
+		}
+		INFO_LOG(Log::G3D, "WiiU SoftGPU: fb %08x fmt %d stride %d, src %dx%d, texture %dx%d %s, %d/%d pixels not black (first %08x), %d prims in %d frames",
+			displayFramebuf_, (int)displayFormat_, displayStride_, srcwidth, srcheight, desc.width, desc.height, Draw::DataFormatToString(desc.format),
+			nonZero, total, sample, g_wiiuPrimsSinceReport, g_wiiuFramesSinceReport);
+		g_wiiuPrimsSinceReport = 0;
+		g_wiiuFramesSinceReport = 0;
+	}
+#endif
 	fbTex = draw_->CreateTexture(desc);
 
 	if (GetGPUBackend() == GPUBackend::OPENGL) {
@@ -952,6 +984,9 @@ bool SoftGPU::CopyBlockTransfer(u32 srcBasePtr, u32 srcStride, int srcX, int src
 }
 
 void SoftGPU::Execute_Prim(u32 op, u32 diff) {
+#if PPSSPP_PLATFORM(WIIU)
+	g_wiiuPrimsSinceReport++;
+#endif
 	u32 count = op & 0xFFFF;
 	// Upper bits are ignored.
 	GEPrimitiveType prim = static_cast<GEPrimitiveType>((op >> 16) & 7);
