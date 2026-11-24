@@ -71,6 +71,20 @@ endif()
 if(WIN32)
 	list(APPEND GPU_IMPLS ${GPU_D3D11})
 endif()
+if(WIIU)
+	list(APPEND GPU_IMPLS
+		GX2/DrawEngineGX2.cpp
+		GX2/DrawEngineGX2.h
+		GX2/FramebufferManagerGX2.cpp
+		GX2/FramebufferManagerGX2.h
+		GX2/GPU_GX2.cpp
+		GX2/GPU_GX2.h
+		GX2/ShaderManagerGX2.cpp
+		GX2/ShaderManagerGX2.h
+		GX2/TextureCacheGX2.cpp
+		GX2/TextureCacheGX2.h
+	)
+endif()
 if(APPLE AND NOT LIBRETRO)
 	set(GPU_METAL
 		Metal/DrawEngineMetal.h
@@ -238,4 +252,10 @@ if(USE_SYSTEM_ZSTD)
 	target_link_libraries(GPU PUBLIC ${ZSTD_LIBRARY})
 else()
 	target_link_libraries(GPU PUBLIC libzstd_static)
+endif()
+
+if(WIIU)
+	# GPU/GX2 compiles its shaders with CafeGLSL.
+	find_package(cafeglsl REQUIRED)
+	target_link_libraries(GPU PUBLIC cafeglsl::cafeglsl)
 endif()

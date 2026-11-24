@@ -37,6 +37,10 @@
 #include "GPU/D3D11/GPU_D3D11.h"
 #endif
 
+#if PPSSPP_PLATFORM(WIIU)
+#include "GPU/GX2/GPU_GX2.h"
+#endif
+
 #if PPSSPP_API(METAL)
 #include "GPU/Metal/GPU_Metal.h"
 #endif
@@ -49,6 +53,11 @@ GPUCommon *gpu;
 #endif
 
 static GPUCommon *CreateGPUCore(GPUCore gpuCore, GraphicsContext *ctx, Draw::DrawContext *draw) {
+#if PPSSPP_PLATFORM(WIIU)
+	// GX2 is the only hardware backend there, whatever the backend setting says.
+	if (gpuCore != GPUCORE_SOFTWARE && gpuCore != GPUCORE_NULL)
+		return new GPU_GX2(ctx, draw);
+#endif
 	switch (gpuCore) {
 	case GPUCORE_GLES:
 		// Disable GLES on ARM Windows (but leave it enabled on other ARM platforms).

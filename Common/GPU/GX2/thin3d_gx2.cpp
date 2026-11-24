@@ -49,6 +49,7 @@
 #include <cafeglsl/CafeGLSLCompiler.h>
 
 #include "Common/GPU/thin3d.h"
+#include "Common/GPU/GX2/GX2Native.h"
 #include "Common/GPU/thin3d_create.h"
 #include "Common/GPU/Shader.h"
 #include "Common/Log.h"
@@ -228,7 +229,9 @@ public:
 	}
 	~GX2ScratchRing() { FreeGPU(base_); }
 
-	void Reset() { pos_ = 0; }
+	void Reset() { pos_ = 0; generation_++; }
+	// Changes whenever earlier allocations may be reused.
+	uint32_t Generation() const { return generation_; }
 
 	uint8_t *Alloc(size_t size, size_t align) {
 		size_t start = (pos_ + align - 1) & ~(align - 1);
@@ -236,6 +239,7 @@ public:
 			_assert_msg_(size <= size_, "GX2 scratch allocation too large: %u", (unsigned)size);
 			GX2DrawDone();  // Everything queued so far is done with the old contents.
 			start = 0;
+			generation_++;
 		}
 		pos_ = start + size;
 		return base_ + start;
@@ -245,6 +249,7 @@ private:
 	uint8_t *base_ = nullptr;
 	size_t size_ = 0;
 	size_t pos_ = 0;
+	uint32_t generation_ = 0;
 };
 
 // --- State objects ---
@@ -464,9 +469,11 @@ public:
 
 // --- Shaders ---
 
+}  // namespace Draw
+
 // Vulkan GLSL -> the GLSL 4.50 that CafeGLSL (Mesa, OpenGL rules) accepts:
 // drop descriptor set qualifiers, map the Vulkan-only builtins.
-static std::string PreprocessVulkanGLSL(const char *src, size_t size) {
+std::string GX2PreprocessVulkanGLSL(const char *src, size_t size) {
 	std::string out;
 	out.reserve(size + 128);
 	size_t i = 0;
@@ -500,6 +507,8 @@ static std::string PreprocessVulkanGLSL(const char *src, size_t size) {
 	out.insert(eol + 1, "#define gl_VertexIndex gl_VertexID\n#define gl_InstanceIndex gl_InstanceID\n");
 	return out;
 }
+
+namespace Draw {
 
 class GX2ShaderModule : public ShaderModule {
 public:
@@ -584,7 +593,7 @@ static bool BuildFetchShader(GX2Pipeline *p, const InputLayoutDesc &desc) {
 
 // --- The context ---
 
-class GX2DrawContext : public DrawContext {
+class GX2DrawContext : public DrawContext, public GX2NativeContext {
 public:
 	GX2DrawContext(GX2ColorBuffer *backColor, GX2DepthBuffer *backDepth);
 	~GX2DrawContext();
@@ -645,7 +654,25 @@ public:
 	void Clear(Aspect aspects, uint32_t colorval, float depthVal, int stencilVal) override;
 
 	std::string GetInfoString(InfoField info) const override;
-	uint64_t GetNativeObject(NativeObject obj, void *srcObject) override { return 0; }
+	uint64_t GetNativeObject(NativeObject obj, void *srcObject) override {
+		switch (obj) {
+		case NativeObject::CONTEXT: return (uint64_t)(uintptr_t)static_cast<GX2NativeContext *>(this);
+		case NativeObject::TEXTURE_VIEW: return srcObject ? (uint64_t)(uintptr_t)&((GX2TextureObject *)srcObject)->tex : 0;
+		default: return 0;
+		}
+	}
+
+	// GX2NativeContext
+	uint8_t *AllocScratch(size_t size, size_t align) override { return scratch_.Alloc(size, align); }
+	uint32_t ScratchGeneration() const override { return scratch_.Generation(); }
+	const GX2Texture *BoundTexture(int slot) const override { return slot >= 0 && slot < (int)MAX_TEXTURE_SLOTS ? boundTextures_[slot] : nullptr; }
+	const GX2Sampler *BoundSampler(int slot) const override { return slot >= 0 && slot < (int)MAX_TEXTURE_SLOTS ? boundSamplers_[slot] : nullptr; }
+	bool TargetHasDepth() const override { return curFB_ ? curFB_->HasDepthStencil() : backDepth_ != nullptr; }
+	void ExternalStateChanged() override {
+		// Shaders, fetch shader, blend/depth/raster state and texture bindings: all set again.
+		curPipeline_ = nullptr;
+		pipelineDirty_ = true;
+	}
 	void HandleEvent(Event ev, int width, int height, void *param1, void *param2) override {}
 	void SetInvalidationCallback(InvalidationCallback callback) override { invalidationCallback_ = callback; }
 	int GetFrameCount() override { return frameCount_; }
@@ -664,7 +691,7 @@ private:
 	GX2ColorBuffer *backColor_;
 	GX2DepthBuffer *backDepth_;
 	GX2ContextState *context_ = nullptr;
-	GX2ScratchRing scratch_{ 4 * 1024 * 1024 };
+	GX2ScratchRing scratch_{ 16 * 1024 * 1024 };
 
 	GX2FramebufferObject *curFB_ = nullptr;
 	GX2Pipeline *curPipeline_ = nullptr;
@@ -776,7 +803,7 @@ ShaderModule *GX2DrawContext::CreateShaderModule(ShaderStage stage, ShaderLangua
 		ERROR_LOG(Log::G3D, "GX2: unsupported shader (language %d, stage %d)", (int)language, (int)stage);
 		return nullptr;
 	}
-	return new GX2ShaderModule(stage, PreprocessVulkanGLSL((const char *)data, dataSize), tag);
+	return new GX2ShaderModule(stage, GX2PreprocessVulkanGLSL((const char *)data, dataSize), tag);
 }
 
 Pipeline *GX2DrawContext::CreateGraphicsPipeline(const PipelineDesc &desc, const char *tag) {
@@ -926,6 +953,8 @@ void GX2DrawContext::SetTarget(GX2FramebufferObject *fb) {
 
 void GX2DrawContext::BindFramebufferAsRenderTarget(Framebuffer *fbo, const RenderPassInfo &rp, const char *tag) {
 	SetTarget((GX2FramebufferObject *)PrimaryToNull(fbo));
+	if (invalidationCallback_)
+		invalidationCallback_(InvalidationCallbackFlags::RENDER_PASS_STATE);
 	GX2ColorBuffer *color = CurColor();
 	GX2DepthBuffer *depth = CurDepth();
 	bool cleared = false;
@@ -1057,6 +1086,9 @@ void GX2DrawContext::Invalidate(InvalidationFlags flags) {
 }
 
 void GX2DrawContext::BindPipeline(Pipeline *pipeline) {
+	// thin3d is about to draw: the GPU emulation must set its texture, viewport and scissor again after.
+	if (pipeline && invalidationCallback_)
+		invalidationCallback_(InvalidationCallbackFlags::RENDER_PASS_STATE);
 	if (curPipeline_ != pipeline) {
 		curPipeline_ = (GX2Pipeline *)pipeline;
 		pipelineDirty_ = true;
