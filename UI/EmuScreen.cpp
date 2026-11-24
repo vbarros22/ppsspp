@@ -339,6 +339,9 @@ void EmuScreen::ProcessGameBoot(const Path &filename) {
 	}
 #if PPSSPP_PLATFORM(WIIU)
 	// No hardware GPU backend for GX2 yet: the software renderer draws, thin3d presents.
+	// Through the setting rather than gpuCore alone: other code (PPGe's text atlas windows, for
+	// one) checks bSoftwareRendering to know.
+	g_Config.bSoftwareRendering = true;
 	coreParam.gpuCore = GPUCORE_SOFTWARE;
 #endif
 

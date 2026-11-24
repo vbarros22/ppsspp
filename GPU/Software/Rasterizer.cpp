@@ -151,6 +151,25 @@ void ComputeRasterizerState(RasterizerState *state) {
 			}
 		}
 
+#if PPSSPP_PLATFORM(WIIU)
+		// Bring-up: describe each new texture once (textured draws came out as solid white).
+		{
+			static u32 seen[64];
+			static int seenCount = 0;
+			const u32 key = state->texaddr[0] ^ ((u32)texfmt << 28);
+			bool known = false;
+			for (int k = 0; k < seenCount; k++)
+				known = known || seen[k] == key;
+			if (!known && seenCount < 64) {
+				seen[seenCount++] = key;
+				const u8 *t = state->texptr[0];
+				INFO_LOG(Log::G3D, "WiiU tex: addr %08x fmt %d clutfmt %06x size %dx%d bufw %d texfunc %d texAlpha %d swz %d ptr %p bytes %02x%02x%02x%02x %02x%02x%02x%02x clutaddr %08x",
+					state->texaddr[0], (int)texfmt, gstate.clutformat & 0xFFFFFF, state->samplerID.cached.sizes[0].w, state->samplerID.cached.sizes[0].h,
+					state->texbufw[0], (int)state->samplerID.TexFunc(), (int)state->samplerID.useTextureAlpha, (int)state->samplerID.swizzle, (const void *)t,
+					t ? t[0] : 0, t ? t[1] : 0, t ? t[2] : 0, t ? t[3] : 0, t ? t[4] : 0, t ? t[5] : 0, t ? t[6] : 0, t ? t[7] : 0, gstate.getClutAddress());
+			}
+		}
+#endif
 		state->textureLodSlope = gstate.getTextureLodSlope();
 		state->texLevelMode = gstate.getTexLevelMode();
 		state->texLevelOffset = (int8_t)gstate.getTexLevelOffset16();

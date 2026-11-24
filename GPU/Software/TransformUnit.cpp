@@ -718,6 +718,25 @@ void TransformUnit::ReadVertex(const VertexReader &vreader, const TransformState
 	}
 
 	vertex.v.color1 = 0;
+#if PPSSPP_PLATFORM(WIIU)
+	// Bring-up: the first two vertices drawn with each new texture.
+	{
+		static u32 lastAddr = 0xFFFFFFFF;
+		static int left = 0, budget = 64;
+		if (gstate.isTextureMapEnabled()) {
+			const u32 addr = gstate.getTextureAddress(0);
+			if (addr != lastAddr && budget > 0) {
+				lastAddr = addr;
+				left = 2;
+				budget--;
+			}
+			if (left > 0) {
+				left--;
+				INFO_LOG(Log::G3D, "WiiU vtx: tex %08x uv %f %f color %08x through %d vtype %06x", addr, vertex.v.texturecoords.x, vertex.v.texturecoords.y, vertex.v.color0, (int)gstate.isModeThrough(), gstate.vertType & 0xFFFFFF);
+			}
+		}
+	}
+#endif
 
 	if (state.enableTransform && prepared && prepared->valid) {
 		vertex.clippos = prepared->clippos;
