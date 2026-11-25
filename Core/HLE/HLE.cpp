@@ -1225,8 +1225,42 @@ void hleSetFlipTime(double t) {
 	hleFlipTime = t;
 }
 
+#if PPSSPP_PLATFORM(WIIU)
+// Wii U bring-up: the last syscalls, dumped at the first bad memory access, to find the HLE
+// function that left the game a wrong value (a byte-order bug, most likely).
+struct WiiUSyscallTraceEntry {
+	const char *name;
+	u32 ra, a0, a1, a2, a3, v0;
+};
+static WiiUSyscallTraceEntry g_wiiuTrace[96];
+static u32 g_wiiuTracePos = 0;
+
+void WiiU_DumpSyscallTrace() {
+	const u32 count = std::min<u32>(g_wiiuTracePos, (u32)ARRAY_SIZE(g_wiiuTrace));
+	NOTICE_LOG(Log::HLE, "WiiU trace: last %u syscalls, oldest first", count);
+	for (u32 i = g_wiiuTracePos - count; i < g_wiiuTracePos; i++) {
+		const WiiUSyscallTraceEntry &e = g_wiiuTrace[i % ARRAY_SIZE(g_wiiuTrace)];
+		NOTICE_LOG(Log::HLE, "WiiU trace: %08x=%s(%08x, %08x, %08x, %08x) ra %08x", e.v0, e.name ? e.name : "?", e.a0, e.a1, e.a2, e.a3, e.ra);
+	}
+}
+#endif
+
 void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 	PROFILE_THIS_SCOPE("syscall");
+#if PPSSPP_PLATFORM(WIIU)
+	WiiUSyscallTraceEntry *trace = &g_wiiuTrace[g_wiiuTracePos++ % ARRAY_SIZE(g_wiiuTrace)];
+	trace->name = nullptr;
+	trace->ra = mips->r[MIPS_REG_RA];
+	trace->a0 = mips->r[MIPS_REG_A0];
+	trace->a1 = mips->r[MIPS_REG_A1];
+	trace->a2 = mips->r[MIPS_REG_A2];
+	trace->a3 = mips->r[MIPS_REG_A3];
+	trace->v0 = 0xDEADBEEF;
+	struct TraceFinish {
+		WiiUSyscallTraceEntry *t; MIPSState *m;
+		~TraceFinish() { t->v0 = m->r[MIPS_REG_V0]; }
+	} traceFinish{ trace, mips };
+#endif
 	const bool collectStats = g_coreCollectDebugStats;
 	double start = 0.0;
 	if (collectStats) {
@@ -1240,6 +1274,9 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 		return;
 	}
 	PROFILE_LABEL(info->name);
+#if PPSSPP_PLATFORM(WIIU)
+	trace->name = info->name;
+#endif
 
 	if (info->func) {
 		if (op == g_idleOp)

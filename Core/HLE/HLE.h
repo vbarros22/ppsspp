@@ -348,3 +348,8 @@ inline R hleCallImpl(std::string_view module, std::string_view funcName, F func,
 
 #define hleReportError(t, res, ...) hleDoLog<true, false>(t, LogLevel::LERROR, res, __FILE__, __LINE__, "", ##__VA_ARGS__)
 #define hleReportWarning(t, res, ...) hleDoLog<true, false>(t, LogLevel::LWARNING, res, __FILE__, __LINE__, "", ##__VA_ARGS__)
+
+#include "ppsspp_config.h"
+#if PPSSPP_PLATFORM(WIIU)
+void WiiU_DumpSyscallTrace();
+#endif

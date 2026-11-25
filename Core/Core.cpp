@@ -36,6 +36,8 @@
 #include "Core/Core.h"
 #include "Core/Config.h"
 #include "Core/HLE/HLE.h"
+#include "Core/MIPS/MIPSTables.h"
+#include "Core/MIPS/MIPSDebugInterface.h"
 #include "Core/MIPS/MIPSDebugInterface.h"
 #include "Core/SaveState.h"
 #include "Core/System.h"
@@ -867,7 +869,39 @@ static void RecordException(const MIPSExceptionInfo &e) {
 	}
 }
 
+#if PPSSPP_PLATFORM(WIIU)
+// Once per boot: the syscalls before the first bad access, the registers, and the code around it.
+static void WiiU_DumpFirstMemoryException(u32 address) {
+	static bool dumped = false;
+	if (dumped)
+		return;
+	dumped = true;
+	MIPSState *m = currentMIPS;
+	NOTICE_LOG(Log::CPU, "WiiU first bad access at %08x, pc %08x ra %08x", address, m->pc, m->r[MIPS_REG_RA]);
+	for (int i = 0; i < 32; i += 4) {
+		NOTICE_LOG(Log::CPU, "WiiU regs %s=%08x %s=%08x %s=%08x %s=%08x",
+			MIPSDebugInterface::GetRegName(0, i).c_str(), m->r[i], MIPSDebugInterface::GetRegName(0, i + 1).c_str(), m->r[i + 1],
+			MIPSDebugInterface::GetRegName(0, i + 2).c_str(), m->r[i + 2], MIPSDebugInterface::GetRegName(0, i + 3).c_str(), m->r[i + 3]);
+	}
+	auto disasm = [](const char *what, u32 start, u32 end) {
+		for (u32 a = start; a < end; a += 4) {
+			if (!Memory::IsValidAddress(a))
+				continue;
+			char buf[128];
+			MIPSDisAsm(Memory::Read_Instruction(a), a, buf, sizeof(buf), true);
+			NOTICE_LOG(Log::CPU, "WiiU %s %08x: %08x %s", what, a, Memory::Read_Instruction(a).encoding, buf);
+		}
+	};
+	disasm("ra", (m->r[MIPS_REG_RA] & ~3) - 0x60, (m->r[MIPS_REG_RA] & ~3) + 0x10);
+	disasm("pc", (m->pc & ~3) - 0x80, (m->pc & ~3) + 0x20);
+	WiiU_DumpSyscallTrace();
+}
+#endif
+
 void Core_MemoryException(u32 address, u32 accessSize, u32 pc, MemoryExceptionType type, std::string_view additionalInfo, bool halting) {
+#if PPSSPP_PLATFORM(WIIU)
+	WiiU_DumpFirstMemoryException(address);
+#endif
 	// In jit, we only flush PC when bIgnoreBadMemAccess is off.
 	char pcDetails[128];
 	pcDetails[0] = 0;
