@@ -1288,7 +1288,15 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 	trace->v0 = 0xDEADBEEF;
 	struct TraceFinish {
 		WiiUSyscallTraceEntry *t; MIPSState *m;
-		~TraceFinish() { t->v0 = m->r[MIPS_REG_V0]; WiiU_CheckWatched(t->name, true); }
+		~TraceFinish() {
+			t->v0 = m->r[MIPS_REG_V0];
+			WiiU_CheckWatched(t->name, true);
+			// Every syscall of the first 0.6 s, for comparing with a little-endian run.
+			const u64 ticks = CoreTiming::GetTicks(m);
+			if (ticks < 135000000ULL && t->name && strcmp(t->name, "_sceKernelIdle") != 0) {
+				NOTICE_LOG(Log::HLE, "SC %s(%08x, %08x, %08x, %08x)=%08x ra %08x thr %d t %llu", t->name, t->a0, t->a1, t->a2, t->a3, t->v0, t->ra, (int)__KernelGetCurThread(), (unsigned long long)ticks);
+			}
+		}
 	} traceFinish{ trace, mips };
 #endif
 	const bool collectStats = g_coreCollectDebugStats;
