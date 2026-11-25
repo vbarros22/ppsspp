@@ -101,6 +101,19 @@ inline TextureAlpha CheckAlpha32Rect(const u32 *pixelData, int stride, int width
 	return AlphaSumIsFull(alphaSum, fullAlphaMask) ? TextureAlpha::Solid : TextureAlpha::Any;
 }
 
+// The colors summed here are in memory order (little-endian, as in PSP memory or an expanded CLUT);
+// the masks they're checked against are in value order.
+template <typename ClutT>
+inline u32 AlphaSumToValueOrder(ClutT sum) {
+#if COMMON_BIG_ENDIAN
+	if (sizeof(ClutT) == 2)
+		return (u32)bswap16((u16)sum);
+	return bswap32((u32)sum);
+#else
+	return (u32)sum;
+#endif
+}
+
 template <typename IndexT, typename ClutT>
 inline void DeIndexTexture(/*WRITEONLY*/ ClutT *dest, const IndexT *indexed, int length, const ClutT *clut, u32 *outAlphaSum) {
 	// Usually, there is no special offset, mask, or shift.
@@ -130,7 +143,7 @@ inline void DeIndexTexture(/*WRITEONLY*/ ClutT *dest, const IndexT *indexed, int
 		}
 	}
 
-	*outAlphaSum &= (u32)alphaSum;
+	*outAlphaSum &= AlphaSumToValueOrder(alphaSum);
 }
 
 template <typename IndexT, typename ClutT>
@@ -179,7 +192,7 @@ inline void DeIndexTexture4(/*WRITEONLY*/ ClutT *dest, const u8 *indexed, int le
 		}
 	}
 
-	*outAlphaSum &= (u32)alphaSum;
+	*outAlphaSum &= AlphaSumToValueOrder(alphaSum);
 }
 
 template <typename ClutT>

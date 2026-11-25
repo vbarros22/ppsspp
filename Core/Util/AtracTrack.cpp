@@ -17,16 +17,15 @@ constexpr int FACT_CHUNK_MAGIC = 0x74636166;
 constexpr u32 WAVE_FORMAT_EXTENSIBLE = 0xFFFE;
 constexpr u32 WAVE_FORMAT_AT3 = 0x270;
 
+// Little-endian, whatever the host.
 static u16 Read16(const u8 *buffer, int offset) {
-	u16 value;
-	memcpy(&value, buffer + offset, sizeof(u16));
-	return value;
+	const u8 *p = buffer + offset;
+	return (u16)(p[0] | (p[1] << 8));
 }
 
 static u32 Read32(const u8 *buffer, int offset) {
-	u32 value;
-	memcpy(&value, buffer + offset, sizeof(u32));
-	return value;
+	const u8 *p = buffer + offset;
+	return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
 }
 
 // Old WAVE parser.
@@ -49,11 +48,11 @@ int AnalyzeAtracTrack(const u8 *buffer, u32 size, Track *track, std::string *err
 	}
 
 	struct RIFFFmtChunk {
-		u16 fmtTag;
-		u16 channels;
-		u32 samplerate;
-		u32 avgBytesPerSec;
-		u16 blockAlign;
+		u16_le fmtTag;
+		u16_le channels;
+		u32_le samplerate;
+		u32_le avgBytesPerSec;
+		u16_le blockAlign;
 	};
 
 	u32 offset = 8;
