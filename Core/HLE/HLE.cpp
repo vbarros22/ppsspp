@@ -1295,6 +1295,17 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 			const u64 ticks = CoreTiming::GetTicks(m);
 			if (ticks < 135000000ULL && t->name && strcmp(t->name, "_sceKernelIdle") != 0) {
 				NOTICE_LOG(Log::HLE, "SC %s(%08x, %08x, %08x, %08x)=%08x ra %08x thr %d t %llu", t->name, t->a0, t->a1, t->a2, t->a3, t->v0, t->ra, (int)__KernelGetCurThread(), (unsigned long long)ticks);
+				if (strstr(t->name, "PollAsync") && Memory::IsValid4AlignedRange(t->a1, 8)) {
+					// The async result, and a checksum of the big file read into 08db87c0.
+					u32 sum = 0;
+					if (Memory::IsValidRange(0x08db87c0, 0x1d6800)) {
+						const u8 *p = Memory::GetPointerUnchecked(0x08db87c0);
+						for (u32 i = 0; i < 0x1d6800; i++)
+							sum = sum * 31 + p[i];
+					}
+					NOTICE_LOG(Log::HLE, "SC   result %08x %08x, buffer sum %08x first %08x %08x %08x %08x", Memory::ReadUnchecked_U32(t->a1), Memory::ReadUnchecked_U32(t->a1 + 4), sum,
+						Memory::ReadUnchecked_U32(0x08db87c0), Memory::ReadUnchecked_U32(0x08db87c4), Memory::ReadUnchecked_U32(0x08db87c8), Memory::ReadUnchecked_U32(0x08db87cc));
+				}
 			}
 		}
 	} traceFinish{ trace, mips };
