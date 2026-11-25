@@ -32,6 +32,7 @@
 #include "Common/File/VFS/VFS.h"
 #include "Common/SysError.h"
 #include "Core/FileSystems/DirectoryFileSystem.h"
+#include "Common/WiiUFileIO.h"
 #include "Core/HLE/sceKernel.h"
 #include "Core/HW/MemoryStick.h"
 #include "Core/CoreTiming.h"
@@ -408,6 +409,11 @@ size_t DirectoryFileHandle::Read(u8* pointer, s64 size)
 		bytesRead = fread(pointer, 1, size, hFile);
 #elif defined(_WIN32)
 		::ReadFile(hFile, (LPVOID)pointer, (DWORD)size, (LPDWORD)&bytesRead, 0);
+#elif PPSSPP_PLATFORM(WIIU)
+		{
+			const ssize_t got = WiiU_FileRead(hFile, pointer, size);
+			bytesRead = got < 0 ? 0 : (size_t)got;
+		}
 #else
 		bytesRead = read(hFile, pointer, size);
 #endif
@@ -435,7 +441,11 @@ size_t DirectoryFileHandle::Write(const u8* pointer, s64 size)
 		diskFull = err == ERROR_DISK_FULL || err == ERROR_NOT_ENOUGH_QUOTA;
 	}
 #else
+#if PPSSPP_PLATFORM(WIIU)
+	bytesWritten = WiiU_FileWrite(hFile, pointer, size);
+#else
 	bytesWritten = write(hFile, pointer, size);
+#endif
 	if (bytesWritten == (size_t)-1) {
 		diskFull = errno == ENOSPC;
 	}

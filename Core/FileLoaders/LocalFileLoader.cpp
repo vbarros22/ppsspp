@@ -23,6 +23,7 @@
 #include "Common/File/DirListing.h"
 #include "Core/Util/DarwinFileSystemServices.h"
 #include "Core/FileLoaders/LocalFileLoader.h"
+#include "Common/WiiUFileIO.h"
 
 #if PPSSPP_PLATFORM(ANDROID)
 #include "android/jni/app-android.h"
@@ -196,7 +197,11 @@ size_t LocalFileLoader::ReadAt(s64 absolutePos, size_t bytes, size_t count, void
 	// read() returns -1 on error, not a short count. Dividing that (implicitly
 	// converted to a huge size_t) by bytes would otherwise report a huge bogus
 	// success instead of a failure, so callers would trust unwritten data.
+#if PPSSPP_PLATFORM(WIIU)
+	ssize_t retval = WiiU_FileRead(fd_, data, bytes * count);
+#else
 	ssize_t retval = read(fd_, data, bytes * count);
+#endif
 #if PPSSPP_PLATFORM(WIIU)
 	if (bytes * count >= 0x8000 || (absolutePos >= 0x7800000 && absolutePos < 0x7a00000)) {
 		const u8 *d = (const u8 *)data;

@@ -11,6 +11,11 @@
 // If not, see http://www.gnu.org/licenses/
 
 #include "ppsspp_config.h"
+#include "Common/WiiUFileIO.h"
+#include <unistd.h>
+#include <cstring>
+#include <algorithm>
+#include <mutex>
 #if PPSSPP_PLATFORM(WIIU)
 
 // Memory arena for the Wii U, on coreinit's memory mapping calls.
@@ -109,6 +114,65 @@ u8 *MemArena::Find4GBBase() {
 		INFO_LOG(Log::MemMap, "MemArena: reserved address space at %08x", g_reserved);
 	}
 	return (u8 *)(uintptr_t)g_reserved;
+}
+
+// --- File IO into the mapped views (see WiiUFileIO.h) ---
+
+bool WiiU_IsMappedView(const void *ptr, size_t size) {
+	const uint32_t p = (uint32_t)(uintptr_t)ptr;
+	return g_reserved != 0 && p + size > g_reserved && p < g_reserved + g_reservedSize;
+}
+
+static std::mutex g_bounceLock;
+static constexpr size_t BOUNCE_SIZE = 256 * 1024;
+static uint8_t *g_bounce = nullptr;
+
+static uint8_t *Bounce() {
+	if (!g_bounce)
+		g_bounce = (uint8_t *)memalign(0x40, BOUNCE_SIZE);
+	return g_bounce;
+}
+
+ssize_t WiiU_FileRead(int fd, void *data, size_t size) {
+	if (!WiiU_IsMappedView(data, size))
+		return read(fd, data, size);
+	std::lock_guard<std::mutex> guard(g_bounceLock);
+	uint8_t *bounce = Bounce();
+	if (!bounce)
+		return -1;
+	size_t done = 0;
+	while (done < size) {
+		const size_t chunk = std::min(BOUNCE_SIZE, size - done);
+		const ssize_t got = read(fd, bounce, chunk);
+		if (got < 0)
+			return done ? (ssize_t)done : got;
+		memcpy((uint8_t *)data + done, bounce, got);
+		done += got;
+		if ((size_t)got < chunk)
+			break;
+	}
+	return (ssize_t)done;
+}
+
+ssize_t WiiU_FileWrite(int fd, const void *data, size_t size) {
+	if (!WiiU_IsMappedView(data, size))
+		return write(fd, data, size);
+	std::lock_guard<std::mutex> guard(g_bounceLock);
+	uint8_t *bounce = Bounce();
+	if (!bounce)
+		return -1;
+	size_t done = 0;
+	while (done < size) {
+		const size_t chunk = std::min(BOUNCE_SIZE, size - done);
+		memcpy(bounce, (const uint8_t *)data + done, chunk);
+		const ssize_t put = write(fd, bounce, chunk);
+		if (put < 0)
+			return done ? (ssize_t)done : put;
+		done += put;
+		if ((size_t)put < chunk)
+			break;
+	}
+	return (ssize_t)done;
 }
 
 #endif  // PPSSPP_PLATFORM(WIIU)
