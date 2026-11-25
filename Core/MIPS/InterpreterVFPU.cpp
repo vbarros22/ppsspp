@@ -1,3 +1,4 @@
+#include "ppsspp_config.h"
 // Copyright (c) 2012- PPSSPP Project.
 
 // This program is free software: you can redistribute it and/or modify
@@ -219,6 +220,10 @@ void EatPrefixes(MIPSState *mips)
 	mips->vfpuCtrl[VFPU_CTRL_DPREFIX] = 0;
 }
 
+#if PPSSPP_PLATFORM(WIIU)
+void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op);
+#endif
+
 namespace MIPSInt
 {
 	void Int_VPFX(MIPSState *mips, MIPSOpcode op)
@@ -344,6 +349,12 @@ namespace MIPSInt
 #else
 			float svqd[4];
 			ReadVector(mips, svqd, V_Quad, vt);
+#if PPSSPP_PLATFORM(WIIU)
+			if ((((addr & 0x3FFFFFFF) + 16) - 0x08d96370u) < 0x30u) {
+				u32 w0; memcpy(&w0, &svqd[0], 4);
+				WiiU_WatchWrite(addr, 16, w0, "sv.q");
+			}
+#endif
 
 			mips->space->WriteUnchecked_Float(svqd[0], addr);
 			mips->space->WriteUnchecked_Float(svqd[1], addr + 4);
@@ -1757,6 +1768,10 @@ namespace MIPSInt
 				Core_MemoryException(addr, 4, PC, MemoryExceptionType::WRITE_WORD, "sv.s");
 				break;
 			}
+#if PPSSPP_PLATFORM(WIIU)
+			if (((addr & 0x3FFFFFFF) - 0x08d96370u) < 0x20u)
+				WiiU_WatchWrite(addr, 4, VI(vt), "sv.s");
+#endif
 			mips->space->WriteUnchecked_U32(VI(vt), addr);
 			break;
 		default:

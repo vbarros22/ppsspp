@@ -871,6 +871,19 @@ static void RecordException(const MIPSExceptionInfo &e) {
 }
 
 #if PPSSPP_PLATFORM(WIIU)
+// Bring-up: the interpreter reports CPU stores into a watched range (the heap block Castlevania's
+// free() finds corrupted).
+void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op) {
+	static int count = 0;
+	if (++count > 200)
+		return;
+	MIPSState *m = currentMIPS;
+	char buf[128];
+	MIPSDisAsm(Memory::Read_Instruction(m->pc), m->pc, buf, sizeof(buf), true);
+	NOTICE_LOG(Log::CPU, "WiiU watch #%d: %s %08x size %u value %08x, pc %08x%s ra %08x ticks %llu | %s", count, op, addr, size, value,
+		m->pc, ModuleAddressSuffix(m->pc).c_str(), m->r[MIPS_REG_RA], (unsigned long long)CoreTiming::GetTicks(m), buf);
+}
+
 // Once per boot: the syscalls before the first bad access, the registers, and the code around it.
 static void WiiU_DumpFirstMemoryException(u32 address) {
 	static bool dumped = false;

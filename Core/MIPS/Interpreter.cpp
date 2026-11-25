@@ -1,3 +1,4 @@
+#include "ppsspp_config.h"
 // Copyright (c) 2012- PPSSPP Project.
 
 // This program is free software: you can redistribute it and/or modify
@@ -155,6 +156,13 @@ static void WriteMMIO(MIPSState *mips, u32 addr, int size, u32 value) {
 	}
 	MMIO::Write(mips, addr, size, value);
 }
+
+#if PPSSPP_PLATFORM(WIIU)
+void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op);
+#define WIIU_WATCH(a, sz, v, name) do { if ((((a) & 0x3FFFFFFF) - 0x08d96370u) < 0x20u) WiiU_WatchWrite((a), (sz), (v), (name)); } while (0)
+#else
+#define WIIU_WATCH(a, sz, v, name) do {} while (0)
+#endif
 
 namespace MIPSInt {
 	void Int_Cache(MIPSState *mips, MIPSOpcode op) {
@@ -585,6 +593,7 @@ namespace MIPSInt {
 				Core_MemoryException(addr, 1, PC, MemoryExceptionType::WRITE_WORD, "sb");
 				break;
 			}
+			WIIU_WATCH(addr, 1, R(rt), "sb");
 			mips->space->WriteUnchecked_U8(R(rt), addr);
 			break; //sb
 		case 41:
@@ -597,6 +606,7 @@ namespace MIPSInt {
 				Core_MemoryException(addr, 2, PC, MemoryExceptionType::WRITE_WORD, "sh");
 				break;
 			}
+			WIIU_WATCH(addr, 2, R(rt), "sh");
 			mips->space->WriteUnchecked_U16(R(rt), addr);
 			break; //sh
 		case 43:
@@ -609,6 +619,7 @@ namespace MIPSInt {
 				Core_MemoryException(addr, 4, PC, MemoryExceptionType::WRITE_WORD, "sw");
 				break;
 			}
+			WIIU_WATCH(addr, 4, R(rt), "sw");
 			mips->space->WriteUnchecked_U32(R(rt), addr);
 			break; //sw
 
@@ -659,6 +670,7 @@ namespace MIPSInt {
 				u32 shift = (addr & 3) * 8;
 				u32 mem = mips->space->ReadUnchecked_U32(addr & 0xfffffffc);
 				u32 result = ( ( u32(R(rt)) >>	(24 - shift) ) ) | (	mem & (0xffffff00 << shift) );
+				WIIU_WATCH(addr & 0xfffffffc, 4, result, "swl");
 				mips->space->WriteUnchecked_U32(result, (addr & 0xfffffffc));
 			}
 			break;
@@ -673,6 +685,7 @@ namespace MIPSInt {
 				u32 shift = (addr & 3) << 3;
 				u32 mem = mips->space->ReadUnchecked_U32(addr & 0xfffffffc);
 				u32 result = ( ( u32(R(rt)) << shift ) | (mem	& (0x00ffffff >> (24 - shift)) ) );
+				WIIU_WATCH(addr & 0xfffffffc, 4, result, "swr");
 				mips->space->WriteUnchecked_U32(result, (addr & 0xfffffffc));
 			}
 			break;
@@ -712,6 +725,7 @@ namespace MIPSInt {
 				Core_MemoryException(addr, 4, PC, MemoryExceptionType::WRITE_WORD, "swc1");
 				break;
 			}
+			WIIU_WATCH(addr, 4, FI(ft), "swc1");
 			mips->space->WriteUnchecked_U32(FI(ft), addr);
 			break; //swc1
 		default:
