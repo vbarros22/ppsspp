@@ -57,7 +57,7 @@ u32 GPU_GX2::CheckGPUFeatures() const {
 void GPU_GX2::DeviceLost() {
 	draw_->Invalidate(InvalidationFlags::CACHED_RENDER_STATE);
 	shaderManager_->ClearShaders();
-	drawEngine_.ClearFetchShaders();
+	drawEngine_.ClearFetchShaders(false);  // At shutdown: no GX2 calls allowed.
 	GPUCommonHW::DeviceLost();
 }
 

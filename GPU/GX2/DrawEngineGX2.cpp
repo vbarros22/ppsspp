@@ -102,7 +102,7 @@ DrawEngineGX2::DrawEngineGX2(Draw::DrawContext *draw) : draw_(draw) {
 }
 
 DrawEngineGX2::~DrawEngineGX2() {
-	ClearFetchShaders();
+	ClearFetchShaders(false);
 }
 
 void DrawEngineGX2::DeviceLost() {
@@ -110,7 +110,7 @@ void DrawEngineGX2::DeviceLost() {
 		draw_->SetInvalidationCallback(InvalidationCallback());
 		invalidationCallbackInstalled_ = false;
 	}
-	ClearFetchShaders();
+	ClearFetchShaders(false);
 	draw_ = nullptr;
 	native_ = nullptr;
 }
@@ -125,10 +125,11 @@ void DrawEngineGX2::NotifyConfigChanged() {
 	ClearFetchShaders();
 }
 
-void DrawEngineGX2::ClearFetchShaders() {
+void DrawEngineGX2::ClearFetchShaders(bool waitForGPU) {
 	if (fetchShaders_.empty())
 		return;
-	GX2DrawDone();  // The GPU may still be reading them.
+	if (waitForGPU)
+		GX2DrawDone();  // The GPU may still be reading them.
 	for (auto &[_, f] : fetchShaders_)
 		MEMFreeToDefaultHeap(f.program);
 	fetchShaders_.clear();

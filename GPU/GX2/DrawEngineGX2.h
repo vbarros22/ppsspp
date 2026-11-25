@@ -39,7 +39,8 @@ public:
 
 	void NotifyConfigChanged() override;
 	// The fetch shaders are keyed by vertex shader, so they go when the shaders do.
-	void ClearFetchShaders();
+	// waitForGPU: false at shutdown, when no GX2 calls are allowed (the frontend drained the GPU already).
+	void ClearFetchShaders(bool waitForGPU = true);
 
 private:
 	void Invalidate(InvalidationCallbackFlags flags);
