@@ -1295,6 +1295,9 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 			const u64 ticks = CoreTiming::GetTicks(m);
 			if (ticks < 135000000ULL && t->name && strcmp(t->name, "_sceKernelIdle") != 0) {
 				NOTICE_LOG(Log::HLE, "SC %s(%08x, %08x, %08x, %08x)=%08x ra %08x thr %d t %llu", t->name, t->a0, t->a1, t->a2, t->a3, t->v0, t->ra, (int)__KernelGetCurThread(), (unsigned long long)ticks);
+				if (strstr(t->name, "sceIoOpen") && Memory::IsValidNullTerminatedString(t->a0)) {
+					NOTICE_LOG(Log::HLE, "SC   path %s", Memory::GetCharPointerUnchecked(t->a0));
+				}
 				if (strstr(t->name, "PollAsync") && Memory::IsValid4AlignedRange(t->a1, 8)) {
 					// The async result, and a checksum of the big file read into 08db87c0.
 					u32 sum = 0;
