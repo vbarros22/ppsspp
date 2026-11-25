@@ -23,6 +23,15 @@
 #include "Core/MIPS/MIPSVFPUUtils.h"
 #include "Core/MIPS/IR/IRInst.h"
 #include "Core/MIPS/IR/IRInterpreter.h"
+
+// HI:LO as one 64-bit value. Not through memory: lo comes first in MIPSState whatever the host's byte order.
+static inline u64 GetLoHi(const MIPSState *mips) {
+	return ((u64)mips->hi << 32) | mips->lo;
+}
+static inline void SetLoHi(MIPSState *mips, u64 value) {
+	mips->lo = (u32)value;
+	mips->hi = (u32)(value >> 32);
+}
 #include "Core/System.h"
 #include "Core/MIPS/MIPSTracer.h"
 
@@ -534,13 +543,29 @@ u32 IRInterpret(MIPSState *mips, const IRInst *inst, const IRInst *chainArena) {
 		{
 			u32 base = mips->r[inst->src1] + inst->constant;
 			// This compiles to a nice SSE load/store on x86, and hopefully similar on ARM.
+#if COMMON_BIG_ENDIAN
+			// PSP memory is little-endian: each lane on its own (as bits, so NaNs stay as they are).
+			for (int i = 0; i < 4; i++) {
+				const u32 bits = space.ReadUnchecked_U32(base + i * 4);
+				memcpy(&mips->f[inst->dest + i], &bits, 4);
+			}
+#else
 			memcpy(&mips->f[inst->dest], space.GetPointerUnchecked(base), 4 * 4);
+#endif
 			IR_NEXT;
 		}
 		IR_CASE(StoreVec4)
 		{
 			u32 base = mips->r[inst->src1] + inst->constant;
+#if COMMON_BIG_ENDIAN
+			for (int i = 0; i < 4; i++) {
+				u32 bits;
+				memcpy(&bits, &mips->f[inst->dest + i], 4);
+				space.WriteUnchecked_U32(bits, base + i * 4);
+			}
+#else
 			memcpy((float *)space.GetPointerUnchecked(base), &mips->f[inst->dest], 4 * 4);
+#endif
 			IR_NEXT;
 		}
 
@@ -1088,45 +1113,45 @@ u32 IRInterpret(MIPSState *mips, const IRInst *inst, const IRInst *chainArena) {
 		IR_CASE(Mult)
 		{
 			s64 result = (s64)(s32)mips->r[inst->src1] * (s64)(s32)mips->r[inst->src2];
-			memcpy(&mips->lo, &result, 8);  // note: lo is followed by hi, so this is ok (little-endian).
+			SetLoHi(mips, (u64)result);
 			IR_NEXT;
 		}
 		IR_CASE(MultU)
 		{
 			u64 result = (u64)mips->r[inst->src1] * (u64)mips->r[inst->src2];
-			memcpy(&mips->lo, &result, 8);
+			SetLoHi(mips, (u64)result);
 			IR_NEXT;
 		}
 		IR_CASE(Madd)
 		{
 			s64 result;
-			memcpy(&result, &mips->lo, 8);
+			result = (s64)GetLoHi(mips);
 			result += (s64)(s32)mips->r[inst->src1] * (s64)(s32)mips->r[inst->src2];
-			memcpy(&mips->lo, &result, 8);
+			SetLoHi(mips, (u64)result);
 			IR_NEXT;
 		}
 		IR_CASE(MaddU)
 		{
 			s64 result;
-			memcpy(&result, &mips->lo, 8);
+			result = (s64)GetLoHi(mips);
 			result += (u64)mips->r[inst->src1] * (u64)mips->r[inst->src2];
-			memcpy(&mips->lo, &result, 8);
+			SetLoHi(mips, (u64)result);
 			IR_NEXT;
 		}
 		IR_CASE(Msub)
 		{
 			s64 result;
-			memcpy(&result, &mips->lo, 8);
+			result = (s64)GetLoHi(mips);
 			result -= (s64)(s32)mips->r[inst->src1] * (s64)(s32)mips->r[inst->src2];
-			memcpy(&mips->lo, &result, 8);
+			SetLoHi(mips, (u64)result);
 			IR_NEXT;
 		}
 		IR_CASE(MsubU)
 		{
 			s64 result;
-			memcpy(&result, &mips->lo, 8);
+			result = (s64)GetLoHi(mips);
 			result -= (u64)mips->r[inst->src1] * (u64)mips->r[inst->src2];
-			memcpy(&mips->lo, &result, 8);
+			SetLoHi(mips, (u64)result);
 			IR_NEXT;
 		}
 
