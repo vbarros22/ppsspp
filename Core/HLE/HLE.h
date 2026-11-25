@@ -352,4 +352,5 @@ inline R hleCallImpl(std::string_view module, std::string_view funcName, F func,
 #include "ppsspp_config.h"
 #if PPSSPP_PLATFORM(WIIU)
 void WiiU_DumpSyscallTrace();
+void WiiU_CheckWatched(const char *what, bool after);
 #endif

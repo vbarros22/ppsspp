@@ -1235,6 +1235,32 @@ struct WiiUSyscallTraceEntry {
 static WiiUSyscallTraceEntry g_wiiuTrace[96];
 static u32 g_wiiuTracePos = 0;
 
+// Bring-up: who changes the watched heap words (see WiiU_WatchWrite in Core.cpp). Compared at every
+// syscall and replaced function, before (changed in between) and after (changed by it).
+void WiiU_CheckWatched(const char *what, bool after) {
+	static u8 snap[32];
+	static bool init = false;
+	static int reports = 0;
+	const u32 addr = 0x08d96370;
+	if (!Memory::IsValidRange(addr, 32))
+		return;
+	const u8 *p = Memory::GetPointerUnchecked(addr);
+	if (!init) {
+		memcpy(snap, p, 32);
+		init = true;
+		return;
+	}
+	if (memcmp(snap, p, 32) != 0) {
+		if (reports++ < 100) {
+			NOTICE_LOG(Log::HLE, "WiiU watched words changed %s %s (pc %08x ra %08x ticks %llu): %08x %08x %08x %08x %08x %08x %08x %08x",
+				after ? "by" : "before", what ? what : "?", currentMIPS->pc, currentMIPS->r[MIPS_REG_RA], (unsigned long long)CoreTiming::GetTicks(currentMIPS),
+				Memory::ReadUnchecked_U32(addr), Memory::ReadUnchecked_U32(addr + 4), Memory::ReadUnchecked_U32(addr + 8), Memory::ReadUnchecked_U32(addr + 12),
+				Memory::ReadUnchecked_U32(addr + 16), Memory::ReadUnchecked_U32(addr + 20), Memory::ReadUnchecked_U32(addr + 24), Memory::ReadUnchecked_U32(addr + 28));
+		}
+		memcpy(snap, p, 32);
+	}
+}
+
 void WiiU_DumpSyscallTrace() {
 	const u32 count = std::min<u32>(g_wiiuTracePos, (u32)ARRAY_SIZE(g_wiiuTrace));
 	NOTICE_LOG(Log::HLE, "WiiU trace: last %u syscalls, oldest first", count);
@@ -1258,7 +1284,7 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 	trace->v0 = 0xDEADBEEF;
 	struct TraceFinish {
 		WiiUSyscallTraceEntry *t; MIPSState *m;
-		~TraceFinish() { t->v0 = m->r[MIPS_REG_V0]; }
+		~TraceFinish() { t->v0 = m->r[MIPS_REG_V0]; WiiU_CheckWatched(t->name, true); }
 	} traceFinish{ trace, mips };
 #endif
 	const bool collectStats = g_coreCollectDebugStats;
@@ -1276,6 +1302,7 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 	PROFILE_LABEL(info->name);
 #if PPSSPP_PLATFORM(WIIU)
 	trace->name = info->name;
+	WiiU_CheckWatched(info->name, false);
 #endif
 
 	if (info->func) {

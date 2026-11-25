@@ -1375,7 +1375,13 @@ namespace MIPSInt {
 		if (entry && entry->replaceFunc && (entry->flags & REPFLAG_DISABLED) == 0) {
 			// Like a syscall, a replacement function is host code - see Int_Syscall.
 			RestoreHostRoundingMode();
+#if PPSSPP_PLATFORM(WIIU)
+			WiiU_CheckWatched(entry->name, false);
+#endif
 			int cycles = entry->replaceFunc(mips);
+#if PPSSPP_PLATFORM(WIIU)
+			WiiU_CheckWatched(entry->name, true);
+#endif
 			ApplyHostRoundingMode(mips);
 
 			if (entry->flags & (REPFLAG_HOOK | REPFLAG_HOOKEXIT)) {
