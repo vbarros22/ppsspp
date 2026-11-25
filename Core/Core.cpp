@@ -36,6 +36,7 @@
 #include "Core/Core.h"
 #include "Core/Config.h"
 #include "Core/HLE/HLE.h"
+#include "Core/Debugger/MemBlockInfo.h"
 #include "Core/MIPS/MIPSTables.h"
 #include "Core/MIPS/MIPSDebugInterface.h"
 #include "Core/MIPS/MIPSDebugInterface.h"
@@ -894,6 +895,23 @@ static void WiiU_DumpFirstMemoryException(u32 address) {
 	};
 	disasm("ra", (m->r[MIPS_REG_RA] & ~3) - 0x60, (m->r[MIPS_REG_RA] & ~3) + 0x10);
 	disasm("pc", (m->pc & ~3) - 0x80, (m->pc & ~3) + 0x20);
+	// Memory around the pointers in registers, and which HLE writes touched it.
+	auto dumpAround = [](const char *what, u32 addr) {
+		addr &= ~3;
+		if (!Memory::IsValidRange(addr - 0x10, 0x30))
+			return;
+		for (u32 a = addr - 0x10; a < addr + 0x20; a += 16) {
+			NOTICE_LOG(Log::CPU, "WiiU mem %s %08x: %08x %08x %08x %08x", what, a, Memory::ReadUnchecked_U32(a), Memory::ReadUnchecked_U32(a + 4), Memory::ReadUnchecked_U32(a + 8), Memory::ReadUnchecked_U32(a + 12));
+		}
+		for (const MemBlockInfo &info : FindMemInfo(addr - 0x10, 0x30)) {
+			NOTICE_LOG(Log::CPU, "WiiU meminfo %s: flags %x %08x+%x pc %08x ticks %llu '%s'", what, (u32)info.flags, info.start, info.size, info.pc, (unsigned long long)info.ticks, info.tag.c_str());
+		}
+	};
+	static const int regsToDump[] = { MIPS_REG_A0, MIPS_REG_A3, MIPS_REG_T2, MIPS_REG_S0, MIPS_REG_V1 };
+	for (int r : regsToDump) {
+		dumpAround(MIPSDebugInterface::GetRegName(0, r).c_str(), m->r[r]);
+	}
+	NOTICE_LOG(Log::CPU, "WiiU now ticks %llu", (unsigned long long)CoreTiming::GetTicks(currentMIPS));
 	WiiU_DumpSyscallTrace();
 }
 #endif

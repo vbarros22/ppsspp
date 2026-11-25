@@ -1,3 +1,4 @@
+#include "ppsspp_config.h"
 // Copyright (c) 2012- PPSSPP Project.
 
 // This program is free software: you can redistribute it and/or modify
@@ -325,6 +326,14 @@ void __KernelFplEndCallback(SceUID threadID, SceUID prevCallbackId);
 void __KernelMemoryInit()
 {
 	MemBlockInfoInit();
+#if PPSSPP_PLATFORM(WIIU)
+	// Bring-up: record small HLE writes too, for the bad-access dump in Core.cpp.
+	static bool wiiuDetailed = false;
+	if (!wiiuDetailed) {
+		wiiuDetailed = true;
+		MemBlockOverrideDetailed();
+	}
+#endif
 	kernelMemory.Init(PSP_GetKernelMemoryBase(), PSP_GetKernelMemoryEnd() - PSP_GetKernelMemoryBase(), false);
 	userMemory.Init(PSP_GetUserMemoryBase(), PSP_GetUserPartitionEnd() - PSP_GetUserMemoryBase(), false);
 	volatileMemory.Init(PSP_GetVolatileMemoryStart(), PSP_GetVolatileMemoryEnd() - PSP_GetVolatileMemoryStart(), false);
