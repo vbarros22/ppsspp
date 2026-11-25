@@ -350,7 +350,7 @@ namespace MIPSInt
 			float svqd[4];
 			ReadVector(mips, svqd, V_Quad, vt);
 #if PPSSPP_PLATFORM(WIIU)
-			if ((((addr & 0x3FFFFFFF) + 16) - 0x08d96370u) < 0x30u) {
+			if ((((addr & 0x3FFFFFFF) + 16) - 0x08d96370u) < 0x30u || (((addr & 0x3FFFFFFF) + 16) - 0x08da23c0u) < 0x30u) {
 				u32 w0; memcpy(&w0, &svqd[0], 4);
 				WiiU_WatchWrite(addr, 16, w0, "sv.q");
 			}
@@ -1769,7 +1769,7 @@ namespace MIPSInt
 				break;
 			}
 #if PPSSPP_PLATFORM(WIIU)
-			if (((addr & 0x3FFFFFFF) - 0x08d96370u) < 0x20u)
+			if (((addr & 0x3FFFFFFF) - 0x08d96370u) < 0x20u || ((addr & 0x3FFFFFFF) - 0x08da23c0u) < 0x20u)
 				WiiU_WatchWrite(addr, 4, VI(vt), "sv.s");
 #endif
 			mips->space->WriteUnchecked_U32(VI(vt), addr);

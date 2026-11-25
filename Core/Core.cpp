@@ -908,6 +908,11 @@ static void WiiU_DumpFirstMemoryException(u32 address) {
 	};
 	disasm("ra", (m->r[MIPS_REG_RA] & ~3) - 0x60, (m->r[MIPS_REG_RA] & ~3) + 0x10);
 	disasm("pc", (m->pc & ~3) - 0x80, (m->pc & ~3) + 0x20);
+	// The heap functions seen writing the watched words (Castlevania bring-up).
+	disasm("f2b8", 0x0880f290, 0x0880f3c0);
+	disasm("f690", 0x0880f670, 0x0880f6f0);
+	disasm("f920", 0x0880f900, 0x0880f970);
+	disasm("d0f4", 0x0882d0c0, 0x0882d140);
 	// Memory around the pointers in registers, and which HLE writes touched it.
 	auto dumpAround = [](const char *what, u32 addr) {
 		addr &= ~3;

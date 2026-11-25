@@ -159,7 +159,7 @@ static void WriteMMIO(MIPSState *mips, u32 addr, int size, u32 value) {
 
 #if PPSSPP_PLATFORM(WIIU)
 void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op);
-#define WIIU_WATCH(a, sz, v, name) do { if ((((a) & 0x3FFFFFFF) - 0x08d96370u) < 0x20u) WiiU_WatchWrite((a), (sz), (v), (name)); } while (0)
+#define WIIU_WATCH(a, sz, v, name) do { const u32 wa_ = (a) & 0x3FFFFFFF; if ((wa_ - 0x08d96370u) < 0x20u || (wa_ - 0x08da23c0u) < 0x20u) WiiU_WatchWrite((a), (sz), (v), (name)); } while (0)
 #else
 #define WIIU_WATCH(a, sz, v, name) do {} while (0)
 #endif
