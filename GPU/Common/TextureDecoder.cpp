@@ -666,11 +666,22 @@ uint32_t GetDXT5Texel(const DXT5Block *src, int x, int y) {
 	return color | (lerp6(src, alphaIndex - 1) << 24);
 }
 
+// The decoders build 0xAABBGGRR values; textures want the bytes R, G, B, A in memory.
+static inline void DXTBlockToMemoryOrder(u32 *dst, int pitch, int width, int height) {
+#if COMMON_BIG_ENDIAN
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++)
+			dst[y * pitch + x] = bswap32(dst[y * pitch + x]);
+	}
+#endif
+}
+
 // This could probably be done faster by decoding two or four blocks at a time with SSE/NEON.
 void DecodeDXT1Block(u32 *dst, const DXT1Block *src, int pitch, int width, int height, u32 *alpha) {
 	DXTDecoder dxt;
 	dxt.DecodeColors(src, false);
 	dxt.WriteColorsDXT1(dst, src, pitch, width, height);
+	DXTBlockToMemoryOrder(dst, pitch, width, height);
 	*alpha &= dxt.AnyNonFullAlpha() ? 0 : 1;
 }
 
@@ -678,6 +689,7 @@ void DecodeDXT3Block(u32 *dst, const DXT3Block *src, int pitch, int width,  int 
 	DXTDecoder dxt;
 	dxt.DecodeColors(&src->color, true);
 	dxt.WriteColorsDXT3(dst, src, pitch, width, height);
+	DXTBlockToMemoryOrder(dst, pitch, width, height);
 }
 
 void DecodeDXT5Block(u32 *dst, const DXT5Block *src, int pitch, int width, int height) {
@@ -685,6 +697,7 @@ void DecodeDXT5Block(u32 *dst, const DXT5Block *src, int pitch, int width, int h
 	dxt.DecodeColors(&src->color, true);
 	dxt.DecodeAlphaDXT5(src);
 	dxt.WriteColorsDXT5(dst, src, pitch, width, height);
+	DXTBlockToMemoryOrder(dst, pitch, width, height);
 }
 
 #ifdef _M_SSE

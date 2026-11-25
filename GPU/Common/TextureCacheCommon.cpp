@@ -1894,6 +1894,19 @@ static void ReverseColors(void *dstBuf, const void *srcBuf, GETextureFormat fmt,
 }
 
 static inline void ConvertFormatToRGBA8888(GETextureFormat format, u32 *dst, const u16 *src, u32 numPixels) {
+#if COMMON_BIG_ENDIAN
+	// The converters read native u16s; PSP textures and CLUTs are little-endian. Swap a copy.
+	u16 swapped[512];
+	while (numPixels > 512) {
+		ConvertFormatToRGBA8888(format, dst, src, 512);
+		dst += 512;
+		src += 512;
+		numPixels -= 512;
+	}
+	for (u32 i = 0; i < numPixels; i++)
+		swapped[i] = bswap16(src[i]);
+	src = swapped;
+#endif
 	switch (format) {
 	case GE_TFMT_4444:
 		ConvertRGBA4444ToRGBA8888(dst, src, numPixels);

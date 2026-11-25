@@ -331,7 +331,7 @@ void __KernelMemoryInit()
 	static bool wiiuDetailed = false;
 	if (!wiiuDetailed) {
 		wiiuDetailed = true;
-		MemBlockOverrideDetailed();
+		// MemBlockOverrideDetailed();  // Off again: slow, and the heap bug is found.
 	}
 #endif
 	kernelMemory.Init(PSP_GetKernelMemoryBase(), PSP_GetKernelMemoryEnd() - PSP_GetKernelMemoryBase(), false);
