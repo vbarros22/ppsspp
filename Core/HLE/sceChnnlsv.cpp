@@ -24,6 +24,11 @@
 #include "Core/HLE/sceChnnlsv.h"
 #include "Core/HLE/sceKernel.h"
 
+// The KIRK headers and counters are little-endian, whatever the host.
+static inline void WriteLE32(u8 *p, u32 v) {
+	p[0] = (u8)v; p[1] = (u8)(v >> 8); p[2] = (u8)(v >> 16); p[3] = (u8)(v >> 24);
+}
+
 static KirkState g_kirk;
 
 KirkState *__ChnnlsvKirkState() {
@@ -100,11 +105,11 @@ static int typeFromMode(int mode)
 
 static int kirkSendCmd(KirkState *kirk, u8* data, int length, int num, bool encrypt)
 {
-	*(int*)(data+0) = encrypt ? KIRK_MODE_ENCRYPT_CBC : KIRK_MODE_DECRYPT_CBC;
-	*(int*)(data+4) = 0;
-	*(int*)(data+8) = 0;
-	*(int*)(data+12) = num;
-	*(int*)(data+16) = length;
+	WriteLE32(data+0, encrypt ? KIRK_MODE_ENCRYPT_CBC : KIRK_MODE_DECRYPT_CBC);
+	WriteLE32(data+4, 0);
+	WriteLE32(data+8, 0);
+	WriteLE32(data+12, num);
+	WriteLE32(data+16, length);
 
 	if (kirk_sceUtilsBufferCopyWithRange(kirk, data, length + 20, data, length + 20, encrypt ? KIRK_CMD_ENCRYPT_IV_0 : KIRK_CMD_DECRYPT_IV_0))
 		return -257;
@@ -114,11 +119,11 @@ static int kirkSendCmd(KirkState *kirk, u8* data, int length, int num, bool encr
 
 static int kirkSendFuseCmd(KirkState *kirk, u8* data, int length, bool encrypt)
 {
-	*(int*)(data+0) = encrypt ? KIRK_MODE_ENCRYPT_CBC : KIRK_MODE_DECRYPT_CBC;
-	*(int*)(data+4) = 0;
-	*(int*)(data+8) = 0;
-	*(int*)(data+12) = 256;
-	*(int*)(data+16) = length;
+	WriteLE32(data+0, encrypt ? KIRK_MODE_ENCRYPT_CBC : KIRK_MODE_DECRYPT_CBC);
+	WriteLE32(data+4, 0);
+	WriteLE32(data+8, 0);
+	WriteLE32(data+12, 256);
+	WriteLE32(data+16, length);
 
 	// Note: CMD 5 and 8 are not available, will always return -1
 	if (kirk_sceUtilsBufferCopyWithRange(kirk, data, length + 20, data, length + 20, encrypt ? KIRK_CMD_ENCRYPT_IV_FUSE : KIRK_CMD_DECRYPT_IV_FUSE))
@@ -179,7 +184,7 @@ static int sub_0000(KirkState *kirk, u8* data_out, u8* data, int alignedLen, con
 	else
 	{
 		memcpy(sp0, sp16, 12);
-		*(u32*)(sp0+12) = data3-1;
+		WriteLE32(sp0+12, data3-1);
 	}
 
 	if (alignedLen > 0)
@@ -187,7 +192,7 @@ static int sub_0000(KirkState *kirk, u8* data_out, u8* data, int alignedLen, con
 		for(int i = 20; i < alignedLen + 20; i += 16)
 		{
 			memcpy(data_out+i, sp16, 12);
-			*(u32*)(data_out+12+i) = data3;
+			WriteLE32(data_out+12+i, data3);
 			data3++;
 		}
 	}
