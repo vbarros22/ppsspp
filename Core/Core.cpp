@@ -870,7 +870,7 @@ static void RecordException(const MIPSExceptionInfo &e) {
 	}
 }
 
-#if PPSSPP_PLATFORM(WIIU)
+#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
 // Bring-up: the interpreter reports CPU stores into a watched range (the heap block Castlevania's
 // free() finds corrupted).
 void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op) {
@@ -935,7 +935,7 @@ static void WiiU_DumpFirstMemoryException(u32 address) {
 #endif
 
 void Core_MemoryException(u32 address, u32 accessSize, u32 pc, MemoryExceptionType type, std::string_view additionalInfo, bool halting) {
-#if PPSSPP_PLATFORM(WIIU)
+#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
 	WiiU_DumpFirstMemoryException(address);
 #endif
 	// In jit, we only flush PC when bIgnoreBadMemAccess is off.

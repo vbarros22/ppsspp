@@ -157,7 +157,7 @@ static void WriteMMIO(MIPSState *mips, u32 addr, int size, u32 value) {
 	MMIO::Write(mips, addr, size, value);
 }
 
-#if PPSSPP_PLATFORM(WIIU)
+#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
 void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op);
 #define WIIU_WATCH(a, sz, v, name) do { const u32 wa_ = (a) & 0x3FFFFFFF; if ((wa_ - 0x08d96370u) < 0x20u || (wa_ - 0x08da23c0u) < 0x20u) WiiU_WatchWrite((a), (sz), (v), (name)); } while (0)
 #else
@@ -1375,11 +1375,11 @@ namespace MIPSInt {
 		if (entry && entry->replaceFunc && (entry->flags & REPFLAG_DISABLED) == 0) {
 			// Like a syscall, a replacement function is host code - see Int_Syscall.
 			RestoreHostRoundingMode();
-#if PPSSPP_PLATFORM(WIIU)
+#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
 			WiiU_CheckWatched(entry->name, false);
 #endif
 			int cycles = entry->replaceFunc(mips);
-#if PPSSPP_PLATFORM(WIIU)
+#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
 			WiiU_CheckWatched(entry->name, true);
 #endif
 			ApplyHostRoundingMode(mips);
