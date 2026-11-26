@@ -40,9 +40,35 @@ GX2VertexShaderObj::GX2VertexShaderObj(VShaderID id, const char *code, bool useH
 	shader = vs;
 	baseLocation = FindUniformBlock(vs->uniformBlocks, vs->uniformBlockCount, "baseVars");
 	lightLocation = FindUniformBlock(vs->uniformBlocks, vs->uniformBlockCount, "lightVars");
+	// Match the inputs by name: what counts is the location CafeGLSL gave each one, which the fetch shader
+	// must feed, not necessarily the layout qualifier's.
+	static const struct { const char *name; PspAttributeLocation loc; } kInputs[] = {
+		{ "position", PspAttributeLocation::POSITION },
+		{ "texcoord", PspAttributeLocation::TEXCOORD },
+		{ "normal", PspAttributeLocation::NORMAL },
+		{ "fog", PspAttributeLocation::NORMAL },
+		{ "cpulit0", PspAttributeLocation::CPU_LIT0 },
+		{ "cpulit1", PspAttributeLocation::CPU_LIT1 },
+		{ "color0", PspAttributeLocation::COLOR0 },
+		{ "color1", PspAttributeLocation::COLOR1 },
+	};
+	for (int i = 0; i < (int)PspAttributeLocation::COUNT; i++)
+		attribLocation[i] = -1;
 	for (uint32_t i = 0; i < vs->attribVarCount; i++) {
-		if (vs->attribVars[i].location < 32)
-			attribMask |= 1u << vs->attribVars[i].location;
+		const GX2AttribVar &v = vs->attribVars[i];
+		bool found = false;
+		for (const auto &in : kInputs) {
+			if (v.name && !strcmp(v.name, in.name)) {
+				attribLocation[(int)in.loc] = (int)v.location;
+				attribMask |= 1u << (int)in.loc;
+				found = true;
+				if ((int)v.location != (int)in.loc)
+					INFO_LOG(Log::G3D, "GX2: vertex input %s at location %d, not %d", v.name, (int)v.location, (int)in.loc);
+				break;
+			}
+		}
+		if (!found)
+			WARN_LOG(Log::G3D, "GX2: unknown vertex input %s (location %d)", v.name ? v.name : "?", (int)v.location);
 	}
 }
 

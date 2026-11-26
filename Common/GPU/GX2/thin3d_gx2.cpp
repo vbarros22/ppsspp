@@ -29,6 +29,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <coreinit/cache.h>
 
 #include <coreinit/memdefaultheap.h>
 #include <gx2/clear.h>
@@ -54,6 +55,9 @@
 #include "Common/GPU/Shader.h"
 #include "Common/Log.h"
 #include "Common/TimeUtil.h"
+
+// Diagnostics: how many more draws to log (set by the frame dump button).
+int g_gx2FlushLog = 0;
 
 namespace Draw {
 

@@ -35,6 +35,8 @@ public:
 	int lightLocation = -1;
 	// Which attribute locations the shader reads (bit per PspAttributeLocation).
 	uint32_t attribMask = 0;
+	// The GX2 location of each PspAttributeLocation input, -1 when not read.
+	int attribLocation[(int)PspAttributeLocation::COUNT];
 
 private:
 	VShaderID id_;

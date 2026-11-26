@@ -32,7 +32,7 @@
 // thin3d texture slots (see thin3d's TEX_SLOT_*): the PSP texture, the framebuffer copy, the CLUT.
 static const int kSlotForSampler[3] = { 0, 1, 3 };
 
-int g_gx2FlushLog = 0;
+extern int g_gx2FlushLog;  // In thin3d_gx2.cpp.
 
 static const GX2PrimitiveMode gx2prim[8] = {
 	GX2_PRIMITIVE_MODE_TRIANGLES,  // Points are expanded to triangles.
@@ -192,7 +192,7 @@ GX2FetchShader *DrawEngineGX2::GetFetchShader(GX2VertexShaderObj *vs, const DecV
 		if (!(vs->attribMask & (1U << (int)loc)))
 			return;  // Not read by this shader.
 		GX2AttribStream s{};
-		s.location = (uint32_t)loc;
+		s.location = (uint32_t)vs->attribLocation[(int)loc];
 		s.buffer = 0;
 		s.offset = offset;
 		s.format = format;
@@ -411,8 +411,10 @@ void DrawEngineGX2::ApplyDrawStateLate(bool applyStencilRef, uint8_t stencilRef)
 	const uint8_t ref = applyStencilRef ? stencilRef : s.stencilRef;
 	GX2SetStencilMask(s.stencilCompareMask, s.stencilWriteMask, ref, s.stencilCompareMask, s.stencilWriteMask, ref);
 
-	// The PSP's front faces are counter-clockwise like in D3D11's setup here, and the flipped viewport mirrors them.
-	GX2SetCullOnlyControl(GX2_FRONT_FACE_CW, s.cullEnable && s.cullFront, s.cullEnable && !s.cullFront);
+	// The PSP's front faces are counter-clockwise, like D3D11's and Vulkan's setup. GX2 decides the facing
+	// before the flipped viewport, so the winding is the PSP's own (with CW, every culled 3D draw lost its
+	// front faces: Castlevania's scenery vanished and the characters were drawn inside out).
+	GX2SetCullOnlyControl(GX2_FRONT_FACE_CCW, s.cullEnable && s.cullFront, s.cullEnable && !s.cullFront);
 
 	gstate_c.Clean(DIRTY_VIEWPORTSCISSOR_STATE | DIRTY_DEPTHSTENCIL_STATE | DIRTY_RASTER_STATE | DIRTY_BLEND_STATE);
 	gstate_c.Dirty(dirtyRequiresRecheck_);
@@ -545,7 +547,17 @@ void DrawEngineGX2::Flush() {
 		const int vSize = cpuClip.numVerts * cpuClip.fmt.stride;
 		if (g_gx2FlushLog > 0) {
 			g_gx2FlushLog--;
-			NOTICE_LOG(Log::G3D, "GX2 flush: HW prim %d draws %d verts %d tex %08x", prim, numDrawInds_, vertexCount, gstate.getTextureAddress(0));
+			const DecVtxFormat &f = cpuClip.fmt;
+			const u8 *v0 = decoded_;
+			float px = 0, py = 0, pz = 0, tu = 0, tv = 0;
+			memcpy(&px, v0 + f.posoff, 4); memcpy(&py, v0 + f.posoff + 4, 4); memcpy(&pz, v0 + f.posoff + 8, 4);
+			if (f.uvfmt == DEC_FLOAT_2) { memcpy(&tu, v0 + f.uvoff, 4); memcpy(&tv, v0 + f.uvoff + 4, 4); }
+			u32 c0 = 0;
+			if (f.c0fmt == DEC_U8_4) memcpy(&c0, v0 + f.c0off, 4);
+			NOTICE_LOG(Log::G3D, "GX2 flush: HW prim %d draws %d verts %d tex %08x lit %d fog %d blend %d mask %x zt %d/%d zw %d at %d vs %s | p %.1f,%.1f,%.1f uv(%d) %.3f,%.3f c0(%d) %08x",
+				prim, numDrawInds_, vertexCount, gstate.getTextureAddress(0), gstate.isLightingEnabled(), gstate.isFogEnabled(),
+				(int)state_.blendEnable, state_.colorMask, (int)state_.depthTest, (int)state_.depthFunc, (int)state_.depthWrite, gstate.isAlphaTestEnabled(),
+				vshader->GetID().Description().c_str(), px, py, pz, f.uvfmt, tu, tv, f.c0fmt, c0);
 		}
 		diagHW_++;
 		if (useElements) {
