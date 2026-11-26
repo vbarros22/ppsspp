@@ -638,7 +638,7 @@ size_t ISOFileSystem::ReadFile(u32 handle, u8 *pointer, s64 size, int &usec) {
 		_dbg_assert_((middleSize & 2047) == 0);
 
 		u32 secNum = (u32)(positionOnIso / 2048);
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 		if (e.isRawSector || size >= 0x10000)
 			NOTICE_LOG(Log::FileSystem, "WiiU ISO read: raw %d pos %llx size %llx first %d middle %lld last %d", (int)e.isRawSector, (unsigned long long)positionOnIso, (long long)size, firstBlockSize, (long long)middleSize, lastBlockSize);
 #endif

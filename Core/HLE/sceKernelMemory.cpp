@@ -326,7 +326,7 @@ void __KernelFplEndCallback(SceUID threadID, SceUID prevCallbackId);
 void __KernelMemoryInit()
 {
 	MemBlockInfoInit();
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 	// Bring-up: record small HLE writes too, for the bad-access dump in Core.cpp.
 	static bool wiiuDetailed = false;
 	if (!wiiuDetailed) {

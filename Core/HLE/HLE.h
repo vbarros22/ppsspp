@@ -350,7 +350,7 @@ inline R hleCallImpl(std::string_view module, std::string_view funcName, F func,
 #define hleReportWarning(t, res, ...) hleDoLog<true, false>(t, LogLevel::LWARNING, res, __FILE__, __LINE__, "", ##__VA_ARGS__)
 
 #include "ppsspp_config.h"
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 void WiiU_DumpSyscallTrace();
 void WiiU_CheckWatched(const char *what, bool after);
 #endif

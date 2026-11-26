@@ -193,7 +193,7 @@ size_t LocalFileLoader::ReadAt(s64 absolutePos, size_t bytes, size_t count, void
 #elif PPSSPP_PLATFORM(SWITCH) || PPSSPP_PLATFORM(WIIU)
 	// Toolchain has no fancy IO API.  We must lock.
 	std::lock_guard<std::mutex> guard(readLock_);
-	off_t seeked = lseek(fd_, absolutePos, SEEK_SET);
+	lseek(fd_, absolutePos, SEEK_SET);
 	// read() returns -1 on error, not a short count. Dividing that (implicitly
 	// converted to a huge size_t) by bytes would otherwise report a huge bogus
 	// success instead of a failure, so callers would trust unwritten data.
@@ -201,13 +201,6 @@ size_t LocalFileLoader::ReadAt(s64 absolutePos, size_t bytes, size_t count, void
 	ssize_t retval = WiiU_FileRead(fd_, data, bytes * count);
 #else
 	ssize_t retval = read(fd_, data, bytes * count);
-#endif
-#if PPSSPP_PLATFORM(WIIU)
-	if (bytes * count >= 0x8000 || (absolutePos >= 0x7800000 && absolutePos < 0x7a00000)) {
-		const u8 *d = (const u8 *)data;
-		NOTICE_LOG(Log::FileSystem, "WiiU ReadAt %llx size %x: lseek %llx read %d, data %p first %02x%02x%02x%02x%02x%02x%02x%02x", (unsigned long long)absolutePos, (unsigned)(bytes * count),
-			(unsigned long long)seeked, (int)retval, data, d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]);
-	}
 #endif
 	return retval < 0 ? 0 : (size_t)retval / bytes;
 #elif PPSSPP_PLATFORM(ANDROID)

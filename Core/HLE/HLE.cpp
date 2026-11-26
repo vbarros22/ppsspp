@@ -1225,7 +1225,7 @@ void hleSetFlipTime(double t) {
 	hleFlipTime = t;
 }
 
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 // Wii U bring-up: the last syscalls, dumped at the first bad memory access, to find the HLE
 // function that left the game a wrong value (a byte-order bug, most likely).
 struct WiiUSyscallTraceEntry {
@@ -1277,7 +1277,7 @@ void WiiU_DumpSyscallTrace() {
 
 void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 	PROFILE_THIS_SCOPE("syscall");
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 	WiiUSyscallTraceEntry *trace = &g_wiiuTrace[g_wiiuTracePos++ % ARRAY_SIZE(g_wiiuTrace)];
 	trace->name = nullptr;
 	trace->ra = mips->r[MIPS_REG_RA];
@@ -1326,7 +1326,7 @@ void CallSyscallWithPC(MIPSState *mips, MIPSOpcode op, u32 pc) {
 		return;
 	}
 	PROFILE_LABEL(info->name);
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 	trace->name = info->name;
 	WiiU_CheckWatched(info->name, false);
 #endif

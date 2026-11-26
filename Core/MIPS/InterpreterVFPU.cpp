@@ -220,7 +220,7 @@ void EatPrefixes(MIPSState *mips)
 	mips->vfpuCtrl[VFPU_CTRL_DPREFIX] = 0;
 }
 
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 void WiiU_WatchWrite(u32 addr, u32 size, u32 value, const char *op);
 #endif
 
@@ -349,7 +349,7 @@ namespace MIPSInt
 #else
 			float svqd[4];
 			ReadVector(mips, svqd, V_Quad, vt);
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 			if ((((addr & 0x3FFFFFFF) + 16) - 0x08d96370u) < 0x30u || (((addr & 0x3FFFFFFF) + 16) - 0x08da23c0u) < 0x30u) {
 				u32 w0; memcpy(&w0, &svqd[0], 4);
 				WiiU_WatchWrite(addr, 16, w0, "sv.q");
@@ -1768,7 +1768,7 @@ namespace MIPSInt
 				Core_MemoryException(addr, 4, PC, MemoryExceptionType::WRITE_WORD, "sv.s");
 				break;
 			}
-#if PPSSPP_PLATFORM(WIIU) || defined(PPSSPP_BRINGUP_TRACE)
+#if defined(PPSSPP_BRINGUP_TRACE)
 			if (((addr & 0x3FFFFFFF) - 0x08d96370u) < 0x20u || ((addr & 0x3FFFFFFF) - 0x08da23c0u) < 0x20u)
 				WiiU_WatchWrite(addr, 4, VI(vt), "sv.s");
 #endif
