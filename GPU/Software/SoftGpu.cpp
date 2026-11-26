@@ -1013,6 +1013,18 @@ void SoftGPU::Execute_Prim(u32 op, u32 diff) {
 		}
 	}
 #endif
+	if (!PPSSPP_PLATFORM(WIIU) && getenv("PPSSPP_PRIMLOG")) {
+		u32 va = gstate_c.vertexAddr;
+		fprintf(stderr, "PRIM %d n=%d vt=%06x thr=%d va=%08x tex=%d %08x fmt=%d bw=%d ab=%d %08x st=%d %06x zt=%d %d zw=%d at=%d %06x ct=%d clr=%d fb=%08x sc=%d,%d-%d,%d v0=%08x %08x %08x %08x\n",
+			(int)((op >> 16) & 7), (int)(op & 0xFFFF), gstate.vertType & 0xFFFFFF, gstate.isModeThrough(), va,
+			gstate.isTextureMapEnabled(), gstate.getTextureAddress(0), (int)gstate.getTextureFormat(), gstate.getTextureWidth(0),
+			gstate.isAlphaBlendEnabled(), gstate.blend & 0xFFFFFF, gstate.isStencilTestEnabled(), gstate.stenciltest & 0xFFFFFF,
+			gstate.isDepthTestEnabled(), (int)gstate.getDepthTestFunction(), gstate.isDepthWriteEnabled(),
+			gstate.isAlphaTestEnabled(), gstate.alphatest & 0xFFFFFF, gstate.isColorTestEnabled(), gstate.isModeClear(), gstate.getFrameBufRawAddress(),
+			gstate.getScissorX1(), gstate.getScissorY1(), gstate.getScissorX2(), gstate.getScissorY2(),
+			Memory::IsValidAddress(va) ? Memory::ReadUnchecked_U32(va) : 0, Memory::IsValidAddress(va) ? Memory::ReadUnchecked_U32(va+4) : 0,
+			Memory::IsValidAddress(va) ? Memory::ReadUnchecked_U32(va+8) : 0, Memory::IsValidAddress(va) ? Memory::ReadUnchecked_U32(va+12) : 0);
+	}
 	u32 count = op & 0xFFFF;
 	// Upper bits are ignored.
 	GEPrimitiveType prim = static_cast<GEPrimitiveType>((op >> 16) & 7);

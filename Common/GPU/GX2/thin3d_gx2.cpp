@@ -66,9 +66,27 @@ static void *AllocGPU(size_t size, size_t align) {
 	return p;
 }
 
+// GPU memory can still be read by queued commands when an object is destroyed: a texture the
+// game rebuilds (new contents at the same PSP address) is freed while this frame's earlier draws
+// still sample it, and the next allocation reuses the memory. So while a context exists, frees
+// wait until the GPU is done with everything queued (FlushDeferredFrees after GX2DrawDone).
+static std::vector<void *> g_deferredFrees;
+static bool g_deferFrees = false;
+
 static void FreeGPU(void *p) {
-	if (p)
+	if (!p)
+		return;
+	if (g_deferFrees)
+		g_deferredFrees.push_back(p);
+	else
 		MEMFreeToDefaultHeap(p);
+}
+
+// Only after GX2DrawDone.
+static void FlushDeferredFrees() {
+	for (void *p : g_deferredFrees)
+		MEMFreeToDefaultHeap(p);
+	g_deferredFrees.clear();
 }
 
 static GX2CompareFunction ToGX2(Comparison c) {
@@ -238,6 +256,7 @@ public:
 		if (start + size > size_) {
 			_assert_msg_(size <= size_, "GX2 scratch allocation too large: %u", (unsigned)size);
 			GX2DrawDone();  // Everything queued so far is done with the old contents.
+			FlushDeferredFrees();
 			start = 0;
 			generation_++;
 		}
@@ -383,6 +402,21 @@ public:
 		const int srcStride = r.byteStride ? r.byteStride : r.w * bytesPerPixel;
 		for (int y = 0; y < r.h; y++)
 			memcpy(dst + (r.y + y) * RowBytes() + r.x * bytesPerPixel, r.data + y * srcStride, r.w * bytesPerPixel);
+	}
+
+	// New memory for the image, the old one freed once the GPU is done with it.
+	void Rename(bool keepContents) {
+		void *old = tex.surface.image;
+		void *fresh = AllocGPU(tex.surface.imageSize, tex.surface.alignment);
+		if (!fresh) {
+			GX2DrawDone();
+			return;
+		}
+		if (keepContents && old)
+			memcpy(fresh, old, tex.surface.imageSize);
+		tex.surface.image = fresh;
+		FreeGPU(old);
+		lastUsedFrame = -1;
 	}
 
 	GX2Texture tex;
@@ -718,6 +752,7 @@ private:
 
 GX2DrawContext::GX2DrawContext(GX2ColorBuffer *backColor, GX2DepthBuffer *backDepth)
 	: backColor_(backColor), backDepth_(backDepth) {
+	g_deferFrees = true;
 	caps_.vendor = GPUVendor::VENDOR_AMD;  // Latte is an R7xx.
 	caps_.deviceName = "Latte (GX2)";
 	caps_.coordConvention = CoordConvention::Direct3D11;
@@ -765,6 +800,9 @@ GX2DrawContext::~GX2DrawContext() {
 	// The caller (frontend) makes sure the GPU is idle before tearing down.
 	FreeGPU(context_);
 	DestroyGLSLCompiler();
+	// Objects released after this free at once (the frontend idles the GPU before teardown).
+	FlushDeferredFrees();
+	g_deferFrees = false;
 }
 
 uint32_t GX2DrawContext::GetDataFormatSupport(DataFormat fmt) const {
@@ -909,8 +947,10 @@ void GX2DrawContext::UpdateTextureLevels(Texture *texture, const uint8_t **data,
 	GX2TextureObject *tex = (GX2TextureObject *)texture;
 	if (!tex)
 		return;
-	if (tex->lastUsedFrame == frameCount_)
-		GX2DrawDone();
+	if (tex->lastUsedFrame == frameCount_) {
+		// Queued draws still read the old contents: give the texture new memory instead of waiting.
+		tex->Rename(false);
+	}
 	tex->Upload(data ? data[0] : nullptr, initDataCallback);
 }
 
@@ -919,7 +959,7 @@ void GX2DrawContext::UpdateTextureRegions(Texture *texture, int level, const Tex
 	if (!tex || level != 0)
 		return;
 	if (tex->lastUsedFrame == frameCount_)
-		GX2DrawDone();
+		tex->Rename(true);
 	for (int i = 0; i < numRegions; i++)
 		tex->UploadRegion(regions[i]);
 	GX2Invalidate(GX2_INVALIDATE_MODE_CPU_TEXTURE, tex->tex.surface.image, tex->tex.surface.imageSize);
@@ -1297,6 +1337,7 @@ void GX2DrawContext::Present(PresentMode presentMode) {
 	GX2SwapScanBuffers();
 	GX2Flush();
 	GX2DrawDone();  // Frees this frame's scratch memory for the next one.
+	FlushDeferredFrees();
 	GX2SetTVEnable(TRUE);
 	GX2SetDRCEnable(TRUE);
 	GX2SetContextState(context_);
