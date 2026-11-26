@@ -479,6 +479,7 @@ u32 AuCtx::AuDecode(u32 pcmAddr) {
 		int outSamples = 0;
 		decoder->Decode(&sourcebuff[nextSync], (int)sourcebuff.size() - nextSync, &inbytesConsumed, 2, (int16_t *)outbuf, &outSamples);
 		outpcmbufsize = outSamples * 2 * sizeof(int16_t);
+		SwapS16ToLE(outbuf, outSamples * 2);
 
 		if (outpcmbufsize == 0) {
 			// Nothing was output, hopefully we're at the end of the stream.

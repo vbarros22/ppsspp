@@ -929,6 +929,9 @@ u32 Atrac2::DecodeInternal(u32 outbufAddr, int *SamplesNum, int *finish) {
 			const int frameOffset = info.decodePos & info.SamplesFrameMask();
 			const int count = std::min(samplesToDecode, (int)ATRAC3PLUS_MAX_SAMPLES - frameOffset);
 			memcpy(outBuf, decodeTemp_ + frameOffset * outputChannels_, count * outputChannels_ * sizeof(int16_t));
+			SwapS16ToLE(outBuf, count * outputChannels_);
+		} else if (outBuf && samplesToDecode != 0) {
+			SwapS16ToLE(outBuf, samplesToDecode * outputChannels_);
 		}
 
 		// Handle increments and looping.

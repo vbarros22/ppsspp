@@ -1133,6 +1133,7 @@ int MediaEngine::getAudioSamples(u32 bufferPtr) {
 		}
 		int outBytes = outSamples * sizeof(int16_t) * 2;
 
+		SwapS16ToLE(buffer, outBytes / 2);
 		NotifyMemInfo(MemBlockFlags::WRITE, bufferPtr, outBytes, "VideoDecodeAudio");
 	}
 

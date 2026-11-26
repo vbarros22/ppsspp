@@ -786,6 +786,8 @@ u32 Atrac::DecodeData(u8 *outbuf, u32 outbufPtr, int *SamplesNum, int *finish, i
 			}
 		}
 
+		if (outbuf)
+			SwapS16ToLE(outbuf, numSamples * outputChannels_);
 		if (packetAddr != 0 && MemBlockInfoDetailed()) {
 			char tagData[128];
 			size_t tagSize = FormatMemWriteTagAt(tagData, sizeof(tagData), "AtracDecode/", packetAddr, track_.bytesPerFrame);

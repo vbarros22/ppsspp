@@ -1208,6 +1208,7 @@ static int sceAtracLowLevelDecode(int atracID, u32 sourceAddr, u32 sourceBytesCo
 	int bytesWritten = 0;
 
 	int retval = atrac->DecodeLowLevel(srcp, &bytesConsumed, outp, &bytesWritten);
+	SwapS16ToLE(outp, bytesWritten / 2);
 	*srcConsumed = bytesConsumed;
 	*outWritten = bytesWritten;
 

@@ -647,6 +647,7 @@ static int sceAudiocodecDecode(u32 ctxPtr, int codec) {
 			return hleLogError(Log::ME, 0, "Output buffer at %08x can't hold a frame", ctx->outBuf);
 		}
 		bool result = decoder->Decode(inBuf, bytesPerFrame, &inDataConsumed, outputChannels, outBuf, &outSamples);
+		SwapS16ToLE(outBuf, outSamples * outputChannels);
 		if (!result && (codec == PSP_CODEC_AT3PLUS || codec == PSP_CODEC_AT3)) {
 			// What the hardware reports for a frame that doesn't decode (0x208 is also possible for
 			// Atrac3+, depending on how far into the frame the problem is). For Atrac3, 0x183 is a

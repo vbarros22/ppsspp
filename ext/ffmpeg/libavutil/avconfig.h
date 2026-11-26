@@ -1,7 +1,11 @@
 /* Written by FFmpeg's configure in a normal build. Kept by hand here, see ext/ffmpeg/README.md. */
 #ifndef AVUTIL_AVCONFIG_H
 #define AVUTIL_AVCONFIG_H
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define AV_HAVE_BIGENDIAN 1
+#else
 #define AV_HAVE_BIGENDIAN 0
+#endif
 #define AV_HAVE_FAST_UNALIGNED 0
 #define AV_HAVE_INCOMPATIBLE_LIBAV_ABI 0
 #endif /* AVUTIL_AVCONFIG_H */

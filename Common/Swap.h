@@ -643,3 +643,18 @@ inline u16 ReadBE16(const u8 *p) {
 inline u32 ReadBE32(const u8 *p) {
 	return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3];
 }
+
+// Audio decoders write native s16 samples. PSP memory wants them little-endian: call this on what was
+// decoded into it. Does nothing on little-endian hosts.
+inline void SwapS16ToLE(void *data, size_t count) {
+#if COMMON_BIG_ENDIAN
+	unsigned short *p = (unsigned short *)data;
+	if (!p)
+		return;
+	for (size_t i = 0; i < count; i++)
+		p[i] = bswap16(p[i]);
+#else
+	(void)data;
+	(void)count;
+#endif
+}

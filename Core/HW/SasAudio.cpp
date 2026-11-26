@@ -539,6 +539,10 @@ void SasVoice::ReadSamples(s16 *output, int numSamples) {
 					break;
 				}
 				Memory::Memcpy(out, pcmAddr + pcmIndex * sizeof(s16), size * sizeof(s16), "SasVoicePCM");
+#if COMMON_BIG_ENDIAN
+				for (u32 i = 0; i < size; i++)
+					out[i] = (s16)bswap16((u16)out[i]);
+#endif
 				pcmIndex += size;
 				needed -= size;
 				out += size;
@@ -699,8 +703,9 @@ void SasInstance::Mix(u32 outAddr, u32 inAddr, int leftVol, int rightVol, bool m
 	// Alright, all voices mixed. Let's convert and clip, and at the same time, wipe mixBuffer for next time. Could also dither.
 	// Raw mode writes four planes of grainSize samples, mixed mode two interleaved.
 	const u32 outBytes = (outputMode == PSP_SAS_OUTPUTMODE_MIXED ? 4 : 8) * grainSize;
-	s16 *outp = (s16 *)Memory::GetPointerWriteRangeOrException(outAddr, outBytes);
-	const s16 *inp = inAddr ? (const s16 *)Memory::GetPointerRangeOrException(inAddr, 4 * grainSize) : 0;
+	// PSP memory: little-endian samples.
+	s16_le *outp = (s16_le *)Memory::GetPointerWriteRangeOrException(outAddr, outBytes);
+	const s16_le *inp = inAddr ? (const s16_le *)Memory::GetPointerRangeOrException(inAddr, 4 * grainSize) : 0;
 	if (!outp) {
 		WARN_LOG_REPORT(Log::sceSas, "Bad SAS Mix output address: %08x, grain=%d", outAddr, grainSize);
 	} else if (outputMode == PSP_SAS_OUTPUTMODE_MIXED) {
@@ -712,10 +717,10 @@ void SasInstance::Mix(u32 outAddr, u32 inAddr, int leftVol, int rightVol, bool m
 			NotifyMemInfo(MemBlockFlags::WRITE, outAddr, grainSize * sizeof(u16) * 2, "SasMix");
 		}
 	} else {
-		s16 *outpL = outp + grainSize * 0;
-		s16 *outpR = outp + grainSize * 1;
-		s16 *outpSendL = outp + grainSize * 2;
-		s16 *outpSendR = outp + grainSize * 3;
+		s16_le *outpL = outp + grainSize * 0;
+		s16_le *outpR = outp + grainSize * 1;
+		s16_le *outpSendL = outp + grainSize * 2;
+		s16_le *outpSendR = outp + grainSize * 3;
 		for (int i = 0; i < grainSize * 2; i += 2) {
 			*outpL++ = clamp_s16(mixBuffer[i + 0]);
 			*outpR++ = clamp_s16(mixBuffer[i + 1]);
@@ -729,7 +734,7 @@ void SasInstance::Mix(u32 outAddr, u32 inAddr, int leftVol, int rightVol, bool m
 }
 
 // Note: leftVol/rightVol here are how much to scale the inp content by, not the mixBuffer.
-void SasInstance::WriteMixedOutput(s16 *outp, const s16 *inp, int leftVol, int rightVol) {
+void SasInstance::WriteMixedOutput(s16_le *outp, const s16_le *inp, int leftVol, int rightVol) {
 	const bool dry = waveformEffect.isDryOn != 0;
 	const bool wet = waveformEffect.isWetOn != 0;
 	if (wet) {

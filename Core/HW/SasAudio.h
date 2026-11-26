@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "Common/CommonTypes.h"
+#include "Common/Swap.h"
 #include "Core/HW/BufferQueue.h"
 #include "Core/HW/SasReverb.h"
 
@@ -324,7 +325,7 @@ public:
 	void ApplyWaveformEffect();
 	void SetWaveformEffectType(int type);
 	void SetWaveformEffectParams(int delay, int feedback);
-	void WriteMixedOutput(s16 *outp, const s16 *inp, int leftVol, int rightVol);
+	void WriteMixedOutput(s16_le *outp, const s16_le *inp, int leftVol, int rightVol);
 
 	void GetDebugText(char *text, size_t bufsize);
 
