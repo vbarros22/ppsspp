@@ -138,8 +138,16 @@ void UpdateNativeMenuKeys() {
 	// Mouse mapping might be problematic in UI, so let's ignore mouse for UI
 	const bool confirmWithCross = g_Config.iButtonPreference == PSP_SYSTEMPARAM_BUTTON_CROSS;
 
+#if PPSSPP_PLATFORM(WIIU)
+	// The face buttons are mapped by position (A, on the right, is Circle; B, at the bottom, is Cross),
+	// so games see what a PSP would give them. PPSSPP's own menus follow the Wii U instead: A confirms,
+	// B cancels, whatever the confirm button setting the games get.
+	const int confirmKey = CTRL_CIRCLE;
+	const int cancelKey = CTRL_CROSS;
+#else
 	const int confirmKey = confirmWithCross ? CTRL_CROSS : CTRL_CIRCLE;
 	const int cancelKey = confirmWithCross ? CTRL_CIRCLE : CTRL_CROSS;
+#endif
 
 	SingleInputMappingFromPspButton(confirmKey, &confirmKeys, true);
 	SingleInputMappingFromPspButton(cancelKey, &cancelKeys, true);
