@@ -173,7 +173,13 @@ void GEState::FastLoadBoneMatrix(u32 addr) {
 	u32 num = boneMatrixNumber;
 	u32 *dst = (u32 *)(boneMatrix + (num & 0x7F));
 
-#ifdef _M_SSE
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	// The display list is little-endian PSP memory.
+	const u32_le *srcLE = (const u32_le *)src;
+	for (int i = 0; i < 12; i++) {
+		dst[i] = (u32)srcLE[i] << 8;
+	}
+#elif defined(_M_SSE)
 	__m128i row1 = _mm_slli_epi32(_mm_loadu_si128((const __m128i *)src), 8);
 	__m128i row2 = _mm_slli_epi32(_mm_loadu_si128((const __m128i *)(src + 4)), 8);
 	__m128i row3 = _mm_slli_epi32(_mm_loadu_si128((const __m128i *)(src + 8)), 8);
