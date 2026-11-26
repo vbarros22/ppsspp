@@ -1007,7 +1007,7 @@ elseif(WIN32)
 elseif(LIBRETRO)
 elseif(WIIU)
 	set(TargetBin PPSSPPWiiU)
-	list(APPEND targetExtra WiiU/WiiUMain.cpp)
+	list(APPEND targetExtra WiiU/WiiUMain.cpp WiiU/WiiUAudio.cpp)
 elseif(HEADLESS_CROSS)
 	# The loongarch64/riscv64 cross builds only build PPSSPPHeadless, and there's no
 	# SDL3 available in those sysroots, so skip the desktop SDL frontend entirely.

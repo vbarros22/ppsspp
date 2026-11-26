@@ -349,19 +349,15 @@ int AnalyzeAA3Track(const u8 *buffer, u32 size, u32 fileSize, Track *track, std:
 }
 
 static inline u32 Read16(const u8 *base, int *offset) {
-	// Little-endian reliance.
-	u32 value = 0;
-	memcpy(&value, base + *offset, 2);
+	const u8 *p = base + *offset;
 	*offset += 2;
-	return value;
+	return (u32)p[0] | ((u32)p[1] << 8);
 }
 
 static inline u32 Read32(const u8 *base, int *offset) {
-	// Little-endian reliance.
-	u32 value = 0;
-	memcpy(&value, base + *offset, 4);
+	const u8 *p = base + *offset;
 	*offset += 4;
-	return value;
+	return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
 }
 
 static const u8 g_atrac3Checkbytes[] = {

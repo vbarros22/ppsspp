@@ -230,8 +230,9 @@ PermissionStatus System_GetPermissionStatus(SystemPermission permission) { retur
 bool System_AudioRecordingIsAvailable() { return false; }
 bool System_AudioRecordingState() { return false; }
 
-// No audio yet: PPSSPP runs fine without a backend. (The System_Audio* helpers live in UI/.)
-AudioBackend *System_CreateAudioBackend() { return nullptr; }
+// AX output, see WiiUAudio.cpp. (The System_Audio* helpers live in UI/.)
+AudioBackend *WiiU_CreateAudioBackend();
+AudioBackend *System_CreateAudioBackend() { return WiiU_CreateAudioBackend(); }
 
 // Set once ProcUI has ended the main loop: from then on, no more system calls like
 // SYSLaunchMenu (they never return). NativeShutdown itself asks to exit (System_ExitApp).

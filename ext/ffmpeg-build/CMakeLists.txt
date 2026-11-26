@@ -25,7 +25,9 @@ list(TRANSFORM FFMPEG_SOURCES PREPEND ${FFMPEG_SRC_DIR}/)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS sources.mk)
 
 add_library(ffmpeg STATIC ${FFMPEG_SOURCES})
-set_target_properties(ffmpeg PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+if(NOT WIIU)
+	set_target_properties(ffmpeg PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+endif()
 
 # config.h is only for FFmpeg itself.
 target_include_directories(ffmpeg PUBLIC ${FFMPEG_SRC_DIR})
