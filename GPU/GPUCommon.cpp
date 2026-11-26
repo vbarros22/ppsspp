@@ -234,12 +234,13 @@ int GPUCommon::EstimateFillCycles(GEPrimitiveType prim, const void *verts, const
 	IndexConverter conv(vertType, inds);
 	float ns = 0.0f;
 	for (int i = 0; i + 1 < count; i += 2) {
-		const s16 *p0 = (const s16 *)((const u8 *)verts + stride * conv(i) + posOffset);
-		const s16 *p1 = (const s16 *)((const u8 *)verts + stride * conv(i + 1) + posOffset);
-		const int x0 = std::max(left, (int)std::min(p0[0], p1[0]));
-		const int x1 = std::min(right, (int)std::max(p0[0], p1[0]));
-		const int y0 = std::max(top, (int)std::min(p0[1], p1[1]));
-		const int y1 = std::min(bottom, (int)std::max(p0[1], p1[1]));
+		const s16_le *p0 = (const s16_le *)((const u8 *)verts + stride * conv(i) + posOffset);
+		const s16_le *p1 = (const s16_le *)((const u8 *)verts + stride * conv(i + 1) + posOffset);
+		const s16 p0x = p0[0], p0y = p0[1], p1x = p1[0], p1y = p1[1];
+		const int x0 = std::max(left, (int)std::min(p0x, p1x));
+		const int x1 = std::min(right, (int)std::max(p0x, p1x));
+		const int y0 = std::max(top, (int)std::min(p0y, p1y));
+		const int y1 = std::min(bottom, (int)std::max(p0y, p1y));
 		if (x1 > x0 && y1 > y0) {
 			// The cache sees the part inside the scissor: a full-width sprite drawn once per 64-pixel
 			// scissor strip costs the same as 64-pixel sprites, and pixels outside are free

@@ -196,7 +196,7 @@ static void WriteCompressed(FILE *fp, const void *p, size_t sz) {
 	u8 *compressed = new u8[compressed_size];
 	compressed_size = ZSTD_compress(compressed, compressed_size, p, sz, 6);
 
-	u32 write_size = (u32)compressed_size;
+	u32_le write_size = (u32)compressed_size;
 	fwrite(&write_size, sizeof(write_size), 1, fp);
 	fwrite(compressed, compressed_size, 1, fp);
 
@@ -218,18 +218,55 @@ Path Recorder::WriteRecording() {
 	Header header{};
 	memcpy(header.magic, HEADER_MAGIC, sizeof(header.magic));
 	header.version = VERSION;
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	header.version = __builtin_bswap32(header.version);
+#endif
 	// A replay looks compat.ini up by this ID, so a PS1 game's dump gets the PS1 emulator's settings. The file
 	// name keeps the game's own.
 	const std::string gameID = PSP_CoreParameter().fileType == IdentifiedFileType::PSP_PS1_PBP ? POPS_COMPAT_ID : g_paramSFO.GetDiscID();
 	strncpy(header.gameID, gameID.c_str(), sizeof(header.gameID));
 	fwrite(&header, sizeof(header), 1, fp);
 
-	u32 sz = (u32)commands.size();
+	u32_le sz = (u32)commands.size();
 	fwrite(&sz, sizeof(sz), 1, fp);
 	u32 bufsz = (u32)pushbuf.size();
-	fwrite(&bufsz, sizeof(bufsz), 1, fp);
+	u32_le bufszLE = bufsz;
+	fwrite(&bufszLE, sizeof(bufszLE), 1, fp);
 
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	// The file is little-endian. PSP memory copied in already is; what we wrote ourselves (register
+	// words and the small structs, all 32-bit fields) and the command table are native.
+	{
+		std::vector<Command> out = commands;
+		std::set<u32> swapped;
+		for (Command &c : out) {
+			switch (c.type) {
+			case CommandType::REGISTERS:
+			case CommandType::CLUTADDR:
+			case CommandType::EDRAMTRANS:
+			case CommandType::MEMCPYDEST:
+			case CommandType::MEMSET:
+			case CommandType::DISPLAY:
+				if (swapped.insert(c.ptr).second) {
+					for (u32 i = 0; i + 4 <= c.sz; i += 4) {
+						u32 v;
+						memcpy(&v, &pushbuf[c.ptr + i], 4);
+						v = __builtin_bswap32(v);
+						memcpy(&pushbuf[c.ptr + i], &v, 4);
+					}
+				}
+				break;
+			default:
+				break;
+			}
+			c.sz = __builtin_bswap32(c.sz);
+			c.ptr = __builtin_bswap32(c.ptr);
+		}
+		WriteCompressed(fp, out.data(), out.size() * sizeof(Command));
+	}
+#else
 	WriteCompressed(fp, commands.data(), commands.size() * sizeof(Command));
+#endif
 	WriteCompressed(fp, pushbuf.data(), bufsz);
 
 	fclose(fp);

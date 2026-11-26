@@ -32,6 +32,8 @@
 // thin3d texture slots (see thin3d's TEX_SLOT_*): the PSP texture, the framebuffer copy, the CLUT.
 static const int kSlotForSampler[3] = { 0, 1, 3 };
 
+int g_gx2FlushLog = 0;
+
 static const GX2PrimitiveMode gx2prim[8] = {
 	GX2_PRIMITIVE_MODE_TRIANGLES,  // Points are expanded to triangles.
 	GX2_PRIMITIVE_MODE_TRIANGLES,  // Lines too.
@@ -541,6 +543,10 @@ void DrawEngineGX2::Flush() {
 
 		GX2FetchShader *fetch = GetFetchShader(vshader, cpuClip.fmt, false);
 		const int vSize = cpuClip.numVerts * cpuClip.fmt.stride;
+		if (g_gx2FlushLog > 0) {
+			g_gx2FlushLog--;
+			NOTICE_LOG(Log::G3D, "GX2 flush: HW prim %d draws %d verts %d tex %08x", prim, numDrawInds_, vertexCount, gstate.getTextureAddress(0));
+		}
 		diagHW_++;
 		if (useElements) {
 			DrawNative(vshader, fshader, fetch, prim, decoded_, vSize, cpuClip.fmt.stride, decIndex_, vertexCount);
@@ -603,6 +609,24 @@ void DrawEngineGX2::Flush() {
 
 		ApplyDrawState(prim);
 		ApplyDrawStateLate(result.setStencil, result.stencilValue);
+
+		if (g_gx2FlushLog > 0) {
+			g_gx2FlushLog--;
+			const TransformedVertex *tv = (const TransformedVertex *)result.drawBuffer;
+			const u16 *ix = inds;
+			char vb[256] = "";
+			if (tv && action == SW_DRAW_INDEXED && result.drawIndexCount > 0) {
+				const TransformedVertex &a = tv[ix[0]];
+				const TransformedVertex &b = tv[ix[result.drawIndexCount - 1]];
+				snprintf(vb, sizeof(vb), "v0 %.1f,%.1f,%.1f w%.2f uv %.3f,%.3f c%08x | vN %.1f,%.1f uv %.3f,%.3f c%08x",
+					a.x, a.y, a.z, a.pos_w, a.u, a.v, a.color0_32, b.x, b.y, b.u, b.v, b.color0_32);
+			}
+			NOTICE_LOG(Log::G3D, "GX2 flush: act %d prim %d draws %d verts %d inds %d/%d tex %08x fmt %d blend %d mask %x zt %d st %d sc %d,%d %dx%d vp %.0f,%.0f %.0fx%.0f %s",
+				(int)action, prim, numDrawInds_, vertexCount, result.drawIndexCount, result.drawVertexCount,
+				gstate.getTextureAddress(0), (int)gstate.getTextureFormat(), (int)state_.blendEnable, state_.colorMask,
+				(int)state_.depthTest, (int)state_.stencilTest, scissor_[0], scissor_[1], scissor_[2], scissor_[3],
+				viewport_.TopLeftX, viewport_.TopLeftY, viewport_.Width, viewport_.Height, vb);
+		}
 
 		if (action == SW_DRAW_INDEXED) {
 			GX2VertexShaderObj *vshader;

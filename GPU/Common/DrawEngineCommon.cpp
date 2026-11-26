@@ -213,14 +213,19 @@ bool DrawEngineCommon::TestBoundingBox(const void *vdata, const void *inds, int 
 	if ((vertType & 0xFFFFFF) == GE_VTYPE_POS_FLOAT && !inds) {
 		// Most games that use bbox use floating point bboxes (Outrun, Tekken 6, Smash Court Tennis 3, Need for Speed Carbon etc).
 		// memcpy(verts, vdata, sizeof(float) * 3 * vertexCount);
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		for (int i = 0; i < vertexCount * 3; i++)
+			verts[i] = ((const float_le *)vdata)[i];
+#else
 		verts = (float *)vdata;
+#endif
 	} else if ((vertType & 0xFFFFFF) == GE_VTYPE_POS_8BIT && !inds) {
 		const s8 *vtx = (const s8 *)vdata;
 		for (int i = 0; i < vertexCount * 3; i++) {
 			verts[i] = vtx[i] * (1.0f / 128.0f);
 		}
 	} else if ((vertType & 0xFFFFFF) == GE_VTYPE_POS_16BIT && !inds) {
-		const s16 *vtx = (const s16 *)vdata;
+		const s16_le *vtx = (const s16_le *)vdata;
 		for (int i = 0; i < vertexCount * 3; i++) {
 			verts[i] = vtx[i] * (1.0f / 32768.0f);
 		}
@@ -269,15 +274,18 @@ bool DrawEngineCommon::TestBoundingBox(const void *vdata, const void *inds, int 
 				break;
 			case GE_VTYPE_POS_16BIT:
 				for (int i = 0; i < vertexCount; i++) {
-					const s16 *data = ((const s16 *)((const s8 *)vdata + i * stride + offset));
+					const s16_le *data = ((const s16_le *)((const s8 *)vdata + i * stride + offset));
 					for (int j = 0; j < 3; j++) {
 						verts[i * 3 + j] = data[j] * (1.0f / 32768.0f);
 					}
 				}
 				break;
 			case GE_VTYPE_POS_FLOAT:
-				for (int i = 0; i < vertexCount; i++)
-					memcpy(&verts[i * 3], (const u8 *)vdata + stride * i + offset, sizeof(float) * 3);
+				for (int i = 0; i < vertexCount; i++) {
+					const float_le *data = (const float_le *)((const u8 *)vdata + stride * i + offset);
+					for (int j = 0; j < 3; j++)
+						verts[i * 3 + j] = data[j];
+				}
 				break;
 			}
 		}
@@ -367,9 +375,9 @@ template<u32 idxFmt>
 static inline const s8 *BoundingBoxVertex(const s8 *srcdata, const void *idata, int stride, int i) {
 	switch (idxFmt) {
 	case GE_VTYPE_IDX_8BIT: return srcdata + ((const u8 *)idata)[i] * stride;
-	case GE_VTYPE_IDX_16BIT: return srcdata + ((const u16 *)idata)[i] * stride;
+	case GE_VTYPE_IDX_16BIT: return srcdata + ((const u16_le *)idata)[i] * stride;
 	// The PSP ignores the upper 16 bits.
-	case GE_VTYPE_IDX_32BIT: return srcdata + (u16)((const u32 *)idata)[i] * stride;
+	case GE_VTYPE_IDX_32BIT: return srcdata + (u16)((const u32_le *)idata)[i] * stride;
 	default: return srcdata + i * stride;
 	}
 }
@@ -774,7 +782,7 @@ bool DrawEngineCommon::TestBoundingBoxThrough(GEPrimitiveType prim, const void *
 		switch (vertType & GE_VTYPE_POS_MASK) {
 		case GE_VTYPE_POS_FLOAT:
 		{
-			const float *pos = (const float*)((const u8 *)vdata + stride * index + posOffset);
+			const float_le *pos = (const float_le *)((const u8 *)vdata + stride * index + posOffset);
 			x = pos[0];
 			y = pos[1];
 			z = pos[2];
@@ -791,10 +799,10 @@ bool DrawEngineCommon::TestBoundingBoxThrough(GEPrimitiveType prim, const void *
 		}
 		case GE_VTYPE_POS_16BIT:
 		{
-			const s16 *pos16 = (const s16 *)((const u8 *)vdata + stride * index + posOffset);
+			const s16_le *pos16 = (const s16_le *)((const u8 *)vdata + stride * index + posOffset);
 			x = pos16[0];
 			y = pos16[1];
-			z = (u16)pos16[2];
+			z = (u16)(s16)pos16[2];
 			break;
 		}
 		default:

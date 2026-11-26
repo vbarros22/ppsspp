@@ -44,6 +44,8 @@
 #include "Common/System/System.h"
 #include "Common/TimeUtil.h"
 #include "Core/Config.h"
+#include "GPU/GPUCommon.h"
+#include "GPU/Debugger/Record.h"
 #include "Core/ConfigValues.h"
 #include "Core/Core.h"
 #include "Core/CmdLine.h"
@@ -129,6 +131,18 @@ static void PollGamePad() {
 	VPADReadError err;
 	if (VPADRead(VPAD_CHAN_0, &status, 1, &err) <= 0 || err != VPAD_READ_SUCCESS)
 		return;
+
+	// Both sticks pressed in: record a GE frame dump of the next frame (PSP/SYSTEM/DUMP), for
+	// replaying on a PC.
+	const uint32_t bothSticks = VPAD_BUTTON_STICK_L | VPAD_BUTTON_STICK_R;
+	if ((status.hold & bothSticks) == bothSticks && (status.trigger & bothSticks) && gpu) {
+		gpu->GetRecorder()->RecordNextFrame([](const Path &dumpPath) {
+			NOTICE_LOG(Log::G3D, "WiiU: frame dump written to %s", dumpPath.c_str());
+		});
+		NOTICE_LOG(Log::G3D, "WiiU: recording a frame dump");
+		extern int g_gx2FlushLog;
+		g_gx2FlushLog = 600;
+	}
 
 	for (const ButtonMap &b : kButtons) {
 		if (status.trigger & b.vpad)
